@@ -12,8 +12,9 @@ Output (assets/models/):
         Materialerne Jersey, Shorts, Socks, Trim og Number farves/udskiftes i spillet.
     ball.glb
     stadium.glb
-        Dele: Pitch, Ground, Goal, Goal2, Boards, Flags, Trees, StandsSmall, StandsBig, Roof, Banners, Floodlights
-    trophy.glb (Cup, Stand), mascot.glb (MascotBody, WingL, WingR)
+        Dele: Pitch, Ground, Goal, Goal2, Boards, Flags, Trees, StandsSmallSides, StandsSmallEnds, StandsBigSides,
+        StandsBigEnds, Roof, Scoreboard, Arch, Banners, Tifo, Beams, Floodlights
+    trophy.glb (Cup, Podium), mascot.glb (MascotBody, WingL, WingR)
     assets/kits/*.jpg (troejemoenstre)
 """
 import math
@@ -159,17 +160,20 @@ def pitch_texture():
     return rp._save("g_pitch", g ** (1 / 2.2))
 
 
-def crowd_texture():
+def crowd_texture(tom=0.08, navn=None):
+    """Tilskuere paa tribunen. tom = andel tomme pladser. Med navn gemmes billedet ogsaa i assets/kits/ til spillet."""
     n, cols, rows = 512, 24, 16
     rng = np.random.default_rng(5)
     img = np.zeros((n, n, 3)) + np.array([0.05, 0.06, 0.10])
+    stole = (np.arange(n)[:, None] % (n // rows)) < 5      # stoleraekker, saa tomme tribuner ikke er helt sorte
+    img[stole[:, 0]] = (0.10, 0.13, 0.22)
     palette = np.array([[0.95, 0.80, 0.10], [0.85, 0.12, 0.12], [0.95, 0.95, 0.95], [0.15, 0.35, 0.85],
                         [0.85, 0.62, 0.45], [0.45, 0.30, 0.20], [0.10, 0.60, 0.25]])
     yy, xx = np.mgrid[0:n, 0:n]
     cw, ch = n / cols, n / rows
     for r in range(rows):
         for c in range(cols):
-            if rng.random() < 0.08:
+            if rng.random() < tom:
                 continue
             cx = (c + 0.5 + (0.5 if r % 2 else 0)) * cw % n
             cy = (r + 0.55) * ch
@@ -178,7 +182,10 @@ def crowd_texture():
             img[body] = col * 0.8
             head = (xx - cx) ** 2 + (yy - (cy + ch * 0.22)) ** 2 < (cw * 0.24) ** 2
             img[head] = palette[4 + rng.integers(2)]
-    return rp._save("g_crowd", img ** (1 / 2.2))
+    if navn:
+        os.makedirs(os.path.join(rp.ROOT, "assets", "kits"), exist_ok=True)
+        _save_jpg(os.path.join(rp.ROOT, "assets", "kits", navn + ".jpg"), img ** (1 / 2.2))
+    return rp._save("g_crowd" + (navn or ""), img ** (1 / 2.2))
 
 
 # ---------------------------------------------------------------- helpers
@@ -575,7 +582,7 @@ def build_character(kind, tex):
 
 # ---------------------------------------------------------------- pokal og maskot
 def build_trophy():
-    """Pokal (Cup) og bord (Stand). Pokalen farves bronze/soelv/guld i spillet."""
+    """Pokal (Cup) og podie med tre trin (Podium). Pokalen farves og skaleres i spillet."""
     bpy.ops.object.empty_add(location=(0, 0, 0))
     root = bpy.context.object
     root.name = "Trophy"
@@ -595,12 +602,13 @@ def build_trophy():
         rp._smooth(o)
     join("Cup", g).parent = root
     g = []
-    box("Top", (0, 0, 0.90), (2.9, 0.75, 0.08), wood, g)
-    for x in (-1.3, 1.3):
-        for y in (-0.28, 0.28):
-            box("Leg", (x, y, 0.43), (0.09, 0.09, 0.86), wood, g)
-    box("Cloth", (0, 0, 0.945), (2.5, 0.5, 0.012), mat("CupCloth", (0.75, 0.06, 0.10), 0.8), g)
-    join("Stand", g).parent = root
+    # podie med tre trin: plads til ni pokaler (tre pr. trin, forreste trin lavest)
+    cloth = mat("CupCloth", (0.75, 0.06, 0.10), 0.8)
+    for k in range(3):
+        hgt = 0.45 * (k + 1)
+        box("Step", (0, -0.5 + 0.5 * k, hgt / 2), (3.4, 0.5, hgt), wood, g)
+        box("StepCloth", (0, -0.5 + 0.5 * k, hgt + 0.006), (3.2, 0.36, 0.012), cloth, g)
+    join("Podium", g).parent = root
     return root
 
 
@@ -733,6 +741,8 @@ def build_stadium():
     root.name = "Stadium"
     white = mat("White", (0.95, 0.95, 0.95), 0.4)
     concrete = mat("Concrete", (0.45, 0.47, 0.50), 0.9)
+    for i, tom in enumerate((1.0, 0.78, 0.45)):     # crowd_0 (tomt), crowd_1 (faa), crowd_2 (halvfyldt); fuldt hus ligger i modellen
+        crowd_texture(tom, f"crowd_{i}")
     crowd = mat("Crowd", (1, 1, 1), 0.9, crowd_texture())
     steel = mat("Steel", (0.20, 0.22, 0.26), 0.5)
     parts = {}
@@ -795,18 +805,21 @@ def build_stadium():
         limb("Leaf2", (x, y, 3.0), (x, y, hgt + 1.2), 1.5, 0.05, leaf[(i + 1) % 2], g, caps=False)
     parts["Trees"] = g
 
-    # tribuner
-    small, big, roof = [], [], []
+    # tribuner: langsider og ender hver for sig, saa stadion kan vokse i ti trin
+    small_s, small_e, big_s, big_e, roof = [], [], [], [], []
     sides = [((-25, -30), (-25, 30), (-1, 0)), ((25, 30), (25, -30), (1, 0)),
              ((22, -37), (-22, -37), (0, -1)), ((-22, 37), (22, 37), (0, 1))]
     roof_mat = mat("RoofMat", (0.92, 0.93, 0.96), 0.4)
     for a, b, n in sides:
-        wedge("StandSmall", a, b, n, 6.0, 1.2, 4.2, concrete, crowd, small)
+        langside = n[0] != 0
+        wedge("StandSmall", a, b, n, 6.0, 1.2, 4.2, concrete, crowd, small_s if langside else small_e)
         nv = Vector((n[0], n[1]))
         a2, b2 = Vector(a) + nv * 6.6, Vector(b) + nv * 6.6
         ext = (b2 - a2).normalized() * 6.0
         a2, b2 = a2 - ext, b2 + ext
-        wedge("StandBig", a2, b2, n, 10.0, 5.2, 13.5, concrete, crowd, big)
+        wedge("StandBig", a2, b2, n, 10.0, 5.2, 13.5, concrete, crowd, big_s if langside else big_e)
+        if n[1] > 0:
+            continue      # ingen tag i den ende, hvor storskaermen staar
         mid = (a2 + b2) / 2 + nv * 5.0
         length = (b2 - a2).length
         size = (11.5, length, 0.3) if n[0] else (length, 11.5, 0.3)
@@ -815,9 +828,57 @@ def build_stadium():
         for t in (0.05, 0.5, 0.95):
             q = a2 + (b2 - a2) * t + nv * 9.8
             limb("RoofPillar", (q.x, q.y, 13.0), (q.x, q.y, 17.4), 0.18, 0.18, steel, roof, caps=False)
-    parts["StandsSmall"] = small
-    parts["StandsBig"] = big
+    parts["StandsSmallSides"] = small_s
+    parts["StandsSmallEnds"] = small_e
+    parts["StandsBigSides"] = big_s
+    parts["StandsBigEnds"] = big_e
     parts["Roof"] = roof
+
+    # storskaerm bag den ene ende
+    g = []
+    screen = mat("Screen", (0.05, 0.25, 0.75), 0.3)
+    sb = screen.node_tree.nodes["Principled BSDF"]
+    for key, val in (("Emission Color", (0.10, 0.35, 1.0, 1.0)), ("Emission Strength", 1.6)):
+        if key in sb.inputs:
+            sb.inputs[key].default_value = val
+    box("ScreenFrame", (0, 55.2, 18.5), (19.0, 0.8, 8.4), steel, g)
+    box("ScreenPanel", (0, 54.75, 18.5), (18.0, 0.15, 7.4), screen, g)
+    text("ScreenText", "MATEMATIK", (0, 54.6, 19.9), 2.3, 0, white, g)
+    text("ScreenText2", "LIGAEN", (0, 54.6, 16.9), 2.3, 0, mat("BoardA", (0.98, 0.78, 0.05), 0.5), g)
+    for x in (-7.5, 7.5):
+        limb("ScreenLeg", (x, 55.4, 0), (x, 55.4, 14.5), 0.5, 0.4, steel, g, caps=False)
+    parts["Scoreboard"] = g
+
+    # bue hen over stadion
+    g = []
+    n_seg, span, top = 18, 47.0, 36.0
+    pts = [(-span + 2 * span * i / n_seg, 40.0, top * (1 - ((-span + 2 * span * i / n_seg) / span) ** 2)) for i in range(n_seg + 1)]
+    for i in range(n_seg):
+        limb("ArchSeg", pts[i], pts[i + 1], 0.75, 0.75, white, g, caps=False)
+    for i in range(3, n_seg - 2, 2):
+        limb("ArchCable", pts[i], (pts[i][0] * 0.85, 40.0, 17.5), 0.07, 0.07, steel, g, caps=False)
+    parts["Arch"] = g
+
+    # kaempebannere (tifo) paa de smaa tribuners skraaning
+    g = []
+    t1, t2 = mat("TeamFlag1", (0.85, 0.08, 0.10), 0.7), mat("TeamFlag2", (0.95, 0.95, 0.95), 0.7)
+    for sx in (-1, 1):
+        for i, y in enumerate((-18, 0, 18)):
+            box("Tifo", (28 * sx, y, 2.9), (6.4, 10.0, 0.08), (t1, t2)[i % 2], g, rot=(0, math.radians(-26.6 * sx), 0))
+            box("TifoStripe", (28 * sx, y, 2.96), (6.5, 2.2, 0.06), (t2, t1)[i % 2], g, rot=(0, math.radians(-26.6 * sx), 0))
+    parts["Tifo"] = g
+
+    # lysshow: lyskegler op i luften
+    g = []
+    beam = mat("Beam", (0.55, 0.85, 1.0), 0.3)
+    bb = beam.node_tree.nodes["Principled BSDF"]
+    for key, val in (("Emission Color", (0.45, 0.80, 1.0, 1.0)), ("Emission Strength", 2.0)):
+        if key in bb.inputs:
+            bb.inputs[key].default_value = val
+    for sx in (-1, 1):
+        for y in (-34, 0, 34):
+            limb("BeamCone", (36 * sx, y, 3), (8 * sx, y * 0.5, 46), 0.25, 2.8, beam, g, caps=False)
+    parts["Beams"] = g
 
     # flag i spillerens farver (farves i spillet)
     g = []
@@ -825,12 +886,12 @@ def build_stadium():
     k = 0
     for sx in (-1, 1):
         for y in range(-24, 25, 8):
-            limb("BannerPole", (31 * sx, y, 4.2), (31 * sx, y, 8.6), 0.08, 0.06, steel, g, caps=False)
+            limb("BannerPole", (31 * sx, y, 0), (31 * sx, y, 8.6), 0.08, 0.06, steel, g, caps=False)
             box("Banner", (31 * sx, y + 1.45, 7.6), (0.06, 2.8, 1.8), (f1, f2)[k % 2], g)
             k += 1
     for sy in (-1, 1):
         for x in range(-16, 17, 8):
-            limb("BannerPole", (x, 43 * sy, 4.2), (x, 43 * sy, 8.6), 0.08, 0.06, steel, g, caps=False)
+            limb("BannerPole", (x, 43 * sy, 0), (x, 43 * sy, 8.6), 0.08, 0.06, steel, g, caps=False)
             box("Banner", (x + 1.45, 43 * sy, 7.6), (2.8, 0.06, 1.8), (f1, f2)[k % 2], g)
             k += 1
     parts["Banners"] = g
@@ -949,7 +1010,7 @@ def render_cards(chars, mascot, trophy):
     spots["mascot"] = mascot
     trophy.location = (300 + 14 * 9, 0, 0)
     for c in trophy.children:
-        if c.name.startswith("Stand"):
+        if c.name.startswith("Podium"):
             c.hide_render = True
         else:
             c.scale = (2.6, 2.6, 2.6)

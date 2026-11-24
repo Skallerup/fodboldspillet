@@ -1,7 +1,7 @@
 // Lydeffekter lavet med Web Audio (ingen lydfiler) og oplæsning med browserens danske stemme.
 let ctx = null;
 let on = true;
-export function setLyd(v) { on = v; }
+export function setLyd(v) { on = v; if (!v && pub) pub.gain.value = 0; }
 
 function ac() {
   if (!ctx) { const C = window.AudioContext || window.webkitAudioContext; if (C) ctx = new C(); }
@@ -43,6 +43,25 @@ export const lyd = {
   aah: () => { noise(0, 1.0, 0.18, 500, 0.6); tone(300, 0, 0.5, 'sine', 0.08, -120); },
   stolpe: () => { tone(880, 0, 0.3, 'square', 0.12, -200); noise(0, 0.9, 0.15, 500, 0.6); },
 };
+
+// Publikum: en vedvarende summen, der bliver højere, når det går godt (niveau 0-1; 0 slukker)
+let pub = null;
+export function publikum(niveau) {
+  const c = ac();
+  if (!c) return;
+  if (!pub) {
+    const len = c.sampleRate * 2;
+    const buf = c.createBuffer(1, len, c.sampleRate);
+    const d = buf.getChannelData(0);
+    for (let i = 0; i < len; i++) d[i] = Math.random() * 2 - 1;
+    const src = c.createBufferSource(); src.buffer = buf; src.loop = true;
+    const f = c.createBiquadFilter(); f.type = 'bandpass'; f.frequency.value = 700; f.Q.value = 0.4;
+    const g = c.createGain(); g.gain.value = 0;
+    src.connect(f).connect(g).connect(c.destination); src.start();
+    pub = g;
+  }
+  pub.gain.setTargetAtTime(on ? niveau * 0.1 : 0, c.currentTime, 0.5);
+}
 
 let stemme = null;
 function findStemme() {

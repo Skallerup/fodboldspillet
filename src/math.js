@@ -60,7 +60,7 @@ function expr(op, terms, signs, answer, style, near = []) {
     h += `<span class="op">${SYMBOL[signs[i - 1]]}</span>${part(terms[i], i)}`;
     s += ` ${ORD[signs[i - 1]]} ${say(terms[i], style)}`;
   }
-  return { op, html: h, say: `Hvad er ${s}?`, answer, style, near };
+  return { op, html: h, say: `Hvad er ${s}?`, answer, style, near, terms, signs };
 }
 function custom(op, h, s, answer, style, near = []) {
   return { op, html: h, say: s, answer, style, near };
@@ -231,13 +231,65 @@ function broekExpr(terms, signs, sameDen) {
 const GEN = { plus, minus, gange, divider, broek };
 
 /** Lav en opgave. regneart: 'blandet', en nøgle fra OPS eller en liste af nøgler (fx ['plus', 'minus']). klasse 0-10, niveau let/mellem/svaer. */
-export function lavOpgave(regneart, klasse, niveau) {
-  const l = Math.max(-1, Math.min(11, klasse + (NIVEAUER[niveau] ?? 0)));
+export function lavOpgave(regneart, klasse, niveau, ekstra = 0) {
+  const l = Math.max(-1, Math.min(11, klasse + (NIVEAUER[niveau] ?? 0) + ekstra));
   const liste = Array.isArray(regneart) ? regneart : regneart === 'blandet' ? Object.keys(OPS) : [regneart];
   const op = pick(liste.length ? liste : Object.keys(OPS));
   const q = GEN[op](l);
   q.negativ = l >= 7;
   return q;
+}
+
+/** Et hint til opgaven (HTML), som hjælper barnet på vej uden at give svaret. */
+export function hint(q) {
+  const t = q.terms, s = q.signs && q.signs[0];
+  if (!t) {
+    if (/Halvdelen/.test(q.html)) return 'Del tallet i to lige store bunker. Hvor mange er der i hver?';
+    if (/class="word">af/.test(q.html)) return 'Del tallet i lige så mange dele, som det nederste tal i brøken siger. Tag så det antal dele, som det øverste tal siger.';
+    if (/<sup>2/.test(q.html)) return 'I anden betyder, at tallet skal ganges med sig selv.';
+    if (/<sup>3/.test(q.html)) return 'I tredje betyder tallet gange sig selv og gange sig selv én gang til.';
+    return 'Læs opgaven en gang til, og tag ét skridt ad gangen.';
+  }
+  const hele = t.every((f) => f.d === 1), negativ = t.some((f) => f.n < 0);
+  const [a, b] = t.map((f) => f.n / f.d);
+  const prikker = (n) => '●'.repeat(n);
+  if (q.op === 'broek') {
+    if (s === '*') return 'Gang tæller med tæller og nævner med nævner.';
+    if (s === ':') return 'At dividere med en brøk er det samme som at gange med den omvendte brøk.';
+    if (t[0].d === t[1].d) return 'Nævnerne er ens. Så skal du kun regne med tællerne og beholde nævneren.';
+    const f = (t[0].d * t[1].d) / gcd(t[0].d, t[1].d);
+    return `Find en fælles nævner først. Begge nævnere går op i ${f}.`;
+  }
+  if (negativ) {
+    if (s === '+') return 'At lægge et negativt tal til er det samme som at trække fra.';
+    if (s === '-') return 'At trække et negativt tal fra er det samme som at lægge til.';
+    return 'Regn først uden fortegn. Minus og minus giver plus. Minus og plus giver minus.';
+  }
+  if (s === '+') {
+    if (!hele) return 'Stil tallene op, så kommaerne står under hinanden, og læg sammen fra højre.';
+    if (t.length === 2 && a <= 10 && b <= 10) return `<span class="prikker">${prikker(a)} + ${prikker(b)}</span>Tæl alle prikkerne.`;
+    if (a + b <= 30) return `Start ved ${Math.max(a, b)}, og tæl ${Math.min(a, b)} frem.`;
+    return a < 1000 ? 'Læg tierne sammen først, og derefter enerne.' : 'Læg tusinderne, hundrederne, tierne og enerne sammen hver for sig.';
+  }
+  if (s === '-') {
+    if (!hele) return 'Stil tallene op, så kommaerne står under hinanden, og træk fra, fra højre.';
+    if (a <= 10) return `<span class="prikker">${prikker(a)}</span>Streg ${b} prikker ud. Hvor mange er der tilbage?`;
+    if (a <= 30) return `Start ved ${a}, og tæl ${b} tilbage.`;
+    return `Hvor meget skal du lægge til ${b} for at nå op på ${a}?`;
+  }
+  if (s === '*') {
+    if (!hele) return 'Gang, som om der ikke var noget komma. Sæt kommaet ind til sidst.';
+    const [stor, lille] = a >= b ? [a, b] : [b, a];
+    if (stor <= 10) return `${a} · ${b} betyder ${a} bunker med ${b} i hver. Læg dem sammen.`;
+    if (lille === 10 || lille === 100 || lille === 1000 || stor % 10 === 0 && [10, 100, 1000].includes(stor)) return 'Når du ganger med 10, 100 eller 1000, rykker tallet lige så mange pladser, som der er nuller.';
+    const tiere = Math.floor(stor / 10) * 10;
+    return `Del ${stor} op: regn ${tiere} · ${lille} og ${stor - tiere} · ${lille}, og læg de to tal sammen.`;
+  }
+  if (s === ':') {
+    if (!hele || q.answer.d !== 1) return 'Hvor mange hele gange går det op? Del resten én gang til for at få decimalerne.';
+    return `Hvor mange gange går ${b} op i ${a}? Prøv med gange: ${b} · ? = ${a}.`;
+  }
+  return 'Tag ét skridt ad gangen.';
 }
 
 /** Fire svarmuligheder (det rigtige svar og tre forkerte), blandet. */

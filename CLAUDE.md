@@ -25,7 +25,8 @@ Dansk 3D-matematikspil til børn (0.-10. klasse) med fodboldtema. Statisk hjemme
 
 ## Butik og opgraderinger
 
-- `src/shop.js`: `TRIN` (stadion, tilskuere, pokaler: købes ét trin ad gangen) og `VALG` (trøje, bold, støvler, jubel: ejes og vælges). `udstyr(p)` giver spillerens udstyr med standardværdier.
+- `src/shop.js`: `TRIN` (stadion, tilskuere, pokaler: ti levels hver, gemt som indeks 0-9) og `VALG` (trøje, bold, støvler, jubel: ejes og vælges). `udstyr(p)` giver spillerens udstyr med standardværdier og oversætter gamle gemte spillere (`o.v`). Tilskuere kræver stadion level 3 (`kraever`).
+- Hvad hvert level viser, står i `World.setStadion` og `World.setUdstyr`; stadion-delene hedder det samme i `build_assets.py` (fx `StandsBigSides`, `Scoreboard`, `Arch`, `Tifo`, `Beams`).
 - `World.setUdstyr(o, kit)` anvender udstyret: stadion-dele, flag (`Banners`), boldfarver, pokaler, maskot. `Figur.setKit` tager trøjemønster (`assets/kits/*.jpg`), støvlefarve og målfejring.
 - Nye ting til butikken: tilføj i `shop.js`, og lav udseendet i `world.js` (farver) eller `build_assets.py` (nye 3D-dele).
 
@@ -42,6 +43,17 @@ Dansk 3D-matematikspil til børn (0.-10. klasse) med fodboldtema. Statisk hjemme
 - Superskud: 5 rigtige i træk giver ét (`kamp.superskud`); `World.skyd(pt, onSpark, true)` er en ildkugle, der ikke kan reddes.
 - `src/daily.js`: dagens udfordring vælges ud fra datoen; `taelDag(p, id)` tæller og udløser præmien én gang pr. dag. Test: `node tests/daily.test.mjs`.
 
+## Kampens forløb
+
+- `besvar` i `main.js`: første forkerte svar giver et hint (`hint(q)` i `math.js`) og ét forsøg mere; rigtigt i andet forsøg tæller som rigtigt, men giver halve point (`kamp.svar[i] === 'halv'`).
+- Automatisk sværhedsgrad: `me.justering` (-2 til +2 klassetrin) går op ved fem rigtige i træk og ned ved tre forkerte i træk. Slås fra med `me.tilpas = false`.
+- Hvert tredje rigtige svar giver en chance (`chance`): skiftevis frispark og friløber, hvor målmanden løber ud, og man har 5 sekunder (`World.startChance`, `slutChance`).
+- Alle skud går gennem `etSkud` og `affyr`; `kamp.sigte` er det aktive skud. Finalen er `finaleLoop`.
+- Hurtig kamp har 5 opgaver (`kamp.antal`). Turneringens `krav` tæller alle mål i kampen.
+- To spillere (`startDuel`, `duelLoop`): fem opgaver hver med egne indstillinger, derefter straffespark, hvor den anden vælger målmandens side (`zone` i `World.skyd`).
+- Rækker (`RAEKKER`) følger `pointIAlt`; `naesteMaal` viser de nærmeste ting at spille for.
+- `World.fart` spoler animationerne frem og bruges kun i test.
+
 ## Grafik og indstillinger
 
 - Hver figur findes i to udgaver: `char_<navn>.glb` (ca. 38.000 trekanter) og `char_<navn>_lite.glb` (ca. 7.500, bygges med `build_assets.py --lite`).
@@ -52,4 +64,4 @@ Dansk 3D-matematikspil til børn (0.-10. klasse) med fodboldtema. Statisk hjemme
 
 ## Idéer til senere
 
-Fælles topscore online, to spillere på samme enhed, flere figurer.
+Fælles topscore online, flere figurer, skøre kampe (regn, sne, nat).

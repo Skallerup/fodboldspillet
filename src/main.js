@@ -1,23 +1,52 @@
 // Spillets forløb og skærmbilleder: spillere, omklædningsrum, kamp, finale, resultat og topscore.
 import { World, FIGURER, GRUNDFIGURER } from './world.js';
 import * as db from './storage.js';
-import { lavOpgave, svarmuligheder, laesSvar, text as fTekst, html as fHtml, same, OPS } from './math.js';
-import { lyd, setLyd, sig, stopTale } from './audio.js';
-import { TRIN, VALG, LAASE, erLaastOp, udstyr, koebTrin, koebTing, brugTing } from './shop.js';
+import { lavOpgave, svarmuligheder, laesSvar, hint, html as fHtml, same, OPS } from './math.js';
+import { lyd, setLyd, sig, stopTale, publikum } from './audio.js';
+import { TRIN, VALG, LAASE, erLaastOp, udstyr, kraeverTekst, koebTrin, koebTing, brugTing } from './shop.js';
 import { dagens, taelDag, DAG_POINT } from './daily.js';
 import { hentKort, alleKort, samling, antalKort, traekKort, SJAELDENHED } from './cards.js';
 
 const ui = document.getElementById('ui');
 const stage = document.getElementById('stage');
 const world = new World(stage);
-const OPGAVER = 10, MAAL_POINT = 25, PERFEKT_BONUS = 30;
+const MAAL_POINT = 25, PERFEKT_BONUS = 30;
 const FARVER = ['#D81E2C', '#1E5BD8', '#F5C400', '#159A48', '#F07818', '#7A2FD0', '#35B6F0', '#15171C', '#F4F4F0'];
 const HOLDNAVNE = ['FC Lynet', 'Tordenstøvlerne', 'Regnehajerne', 'Gangeløverne', 'Brøkbanden', 'Plus United', 'Minus Mestrene',
   'FC Hattrick', 'Talmagikerne', 'Stolpe Ind FC', 'Dribleholdet', 'Sparkemaskinerne'];
 const KAMPRAAB = ['Kom så!', 'Vi giver aldrig op!', 'Fuld fart frem!', 'Regn den ud!', 'Stolpe ind!'];
 const NIVEAU_NAVN = { let: 'Let', mellem: 'Mellem', svaer: 'Svær' };
 // Pokalturnering: tre kampe i træk. krav = mål man skal score i finalen, klog = hvor ofte målmanden gætter rigtigt.
-const RUNDER = [{ navn: 'Kvartfinale', krav: 2, klog: 0.4 }, { navn: 'Semifinale', krav: 3, klog: 0.5 }, { navn: 'Finale', krav: 3, klog: 0.6 }];
+const RUNDER = [{ navn: 'Kvartfinale', krav: 3, klog: 0.4 }, { navn: 'Semifinale', krav: 4, klog: 0.5 }, { navn: 'Finale', krav: 4, klog: 0.6 }];
+// Rækker: man rykker op, når man har optjent nok point i alt
+const RAEKKER = [[0, 'Serie 3'], [300, 'Serie 2'], [800, 'Serie 1'], [1500, 'Danmarksserien'], [2500, '3. division'], [4000, '2. division'],
+  [6000, '1. division'], [9000, 'Superligaen'], [13000, 'Champions League'], [20000, 'Verdensmester']];
+function raekke(p) {
+  let nr = 0;
+  RAEKKER.forEach(([fra], i) => { if (p.pointIAlt >= fra) nr = i; });
+  const naeste = RAEKKER[nr + 1];
+  return { nr, navn: RAEKKER[nr][1], naeste: naeste ? naeste[1] : null, mangler: naeste ? naeste[0] - p.pointIAlt : 0,
+    pct: naeste ? Math.round(((p.pointIAlt - RAEKKER[nr][0]) / (naeste[0] - RAEKKER[nr][0])) * 100) : 100 };
+}
+/** De nærmeste ting at spille for: oprykning, noget i butikken og en hemmelig figur. */
+function naesteMaal(p) {
+  const ud = [];
+  const r = raekke(p);
+  if (r.naeste) ud.push(`${r.mangler} point til oprykning til ${r.naeste}`);
+  const o = udstyr(p);
+  const varer = [];
+  for (const [k, kat] of Object.entries(TRIN)) { const n = kat.trin[o[k] + 1]; if (n && !kraeverTekst(p, k)) varer.push([n.pris, `${kat.navn} level ${o[k] + 2}: ${n.navn}`]); }
+  for (const [k, kat] of Object.entries(VALG)) for (const [id, t] of Object.entries(kat.ting)) if (!o.ejet[k].includes(id)) varer.push([t.pris, `${kat.navn.toLowerCase()}n „${t.navn}“`.replace('støvlern', 'støvlerne').replace('målfejringn', 'målfejringen')]);
+  varer.sort((x, y) => x[0] - y[0]);
+  if (varer.length) ud.push(p.point >= varer[0][0] ? `Du har råd til ${varer[0][1]} i butikken` : `${varer[0][0] - p.point} point til ${varer[0][1]}`);
+  const figurer = Object.entries(LAASE).map(([f, l]) => [f, ...l.status(p)]).filter(([, har, skal]) => har < skal).sort((x, y) => y[1] / y[2] - x[1] / x[2]);
+  if (figurer.length) { const [f, har, skal] = figurer[0]; ud.push(`${FIGURER[f]}: ${har} af ${skal} (${LAASE[f].tekst.toLowerCase()})`); }
+  return ud;
+}
+function maalHtml() {
+  const m = naesteMaal(me);
+  return m.length ? `<div class="dag"><b>Næste mål</b>${m.map((t) => `<span>${t}</span>`).join('')}</div>` : '';
+}
 const TURNERING_POINT = 300;
 const HOLD = {
   rhino: { navn: 'Hornborg IF', farve1: '#6B7280', farve2: '#F4F4F0' },
@@ -149,12 +178,14 @@ function skaermHub() {
   show('s-hub', `<div class="panel">
     <div class="card" style="--c1:${me.farve1};--c2:${me.farve2}">
       <span class="badge">${esc(me.nummer)}</span>
-      <span><b>${esc(me.navn)}</b><small>${esc(me.hold)} · „${esc(me.kampraab)}“</small></span>
+      <span><b>${esc(me.navn)}</b><small>${esc(me.hold)} · ${raekke(me).navn}</small></span>
       <span class="pts">${me.pointIAlt} p</span></div>
     ${btn('spil', 'Spil kamp', 'big wide')}
+    <div class="row">${btn('hurtig', 'Hurtig kamp · 5 opgaver', 'ghost')}${btn('toSpillere', 'To spillere', 'ghost')}</div>
     <button class="summary" data-a="indstillinger"><span><b>${klasseNavn(me.klasse)} · ${NIVEAU_NAVN[me.niveau]}</b><small>${arterTekst}</small></span><span class="inuse">Skift</span></button>
     ${btn('turnering', me.turnering ? `Turnering: ${RUNDER[me.turnering.runde].navn.toLowerCase()}` : 'Pokalturnering', 'ghost wide')}
     ${dagHtml()}
+    ${maalHtml()}
     <div class="tiles">
       <button class="tile" data-a="butik"><b>Butik</b><small>${me.point} p</small></button>
       <button class="tile" data-a="album"><b>Album</b><small>${antalKort(me)}/${alleKort().length}${samling(me) && me.pakker ? ` · ${me.pakker} pakke` : ''}</small></button>
@@ -177,8 +208,12 @@ function skaermIndstil(scroll = 0) {
     <div class="field"><span class="lbl">Regnearter (vælg en eller flere)</span><div class="chips">
       ${Object.entries(OPS).map(([v, l]) => `<button class="chip" data-a="art" data-v="${v}" aria-pressed="${arter(me).includes(v)}">${l}</button>`).join('')}
       <button class="chip" data-a="art" data-v="alle" aria-pressed="${arter(me).length === Object.keys(OPS).length}">Alle</button></div></div>
+    <div class="chips"><button class="chip" data-a="skift" data-k="tilpas" aria-pressed="${me.tilpas !== false}">Tilpas sværhedsgraden automatisk</button></div>
+    <p class="muted">${me.tilpas === false ? 'Opgaverne følger kun det klassetrin og niveau, du har valgt.'
+    : `Fem rigtige i træk gør opgaverne lidt sværere, tre forkerte gør dem lidt lettere.${juster(me) ? ` Lige nu: ${juster(me) > 0 ? '+' : ''}${juster(me)} klassetrin.` : ''}`}</p>
     <h2>Lyd</h2>
     <div class="chips">
+      <button class="chip" data-a="skift" data-k="kommentator" aria-pressed="${me.kommentator !== false}">Kommentator</button>
       <button class="chip" data-a="skift" data-k="lyd" aria-pressed="${me.lyd}">Lydeffekter</button>
       <button class="chip" data-a="skift" data-k="oplaesning" aria-pressed="${me.oplaesning}">Læs opgaver højt</button>
     </div>
@@ -218,7 +253,7 @@ function skaermTurnering() {
     <h1>${r.navn}</h1>
     <div class="list">${RUNDER.map((x, i) => `<div class="item ${i === t.runde ? 'on' : ''}"><span><b>${x.navn}</b><small>${HOLD[t.hold[i]].navn} · ${FIGURER[t.hold[i]]}</small></span>
       <span class="${i < t.runde ? 'inuse' : 'need'}">${i < t.runde ? 'Vundet' : `${x.krav} mål`}</span></div>`).join('')}</div>
-    <p>Du møder <b>${hold.navn}</b>. Scor mindst ${r.krav} mål i finalen for at gå videre. Jo flere rigtige svar, jo flere skud får du.</p>
+    <p>Du møder <b>${hold.navn}</b>. Scor mindst ${r.krav} mål i kampen for at gå videre. Hvert tredje rigtige svar giver en chance, og finalen giver flere skud.</p>
     <p class="muted">Vinder du alle tre kampe, får du turneringspokalen, ${TURNERING_POINT} point og to kortpakker. Taber du, starter turneringen forfra.</p>
     <div class="row">${btn('spilTurnering', 'Spil kampen', 'big')}</div>
     <div class="row">${btn('hub', 'Tilbage', 'ghost')}</div>
@@ -232,20 +267,26 @@ function skaermTop() {
     ${list.length < 2 ? '<p class="muted">Du er alene på listen. Opret flere spillere, og se hvem der fører.</p>' : ''}
     <table class="top"><thead><tr><th></th><th>Spiller</th><th class="n">Bedste kamp</th><th class="n">Point</th></tr></thead><tbody>
     ${list.map((p, i) => `<tr class="${me && p.id === me.id ? 'me' : ''}"><td>${i + 1}</td>
-      <td>${esc(p.navn)}<br><span class="muted">${esc(p.hold)}</span></td><td class="n">${p.bedsteKamp}</td><td class="n">${p.pointIAlt}</td></tr>`).join('')}
+      <td>${esc(p.navn)}<br><span class="muted">${esc(p.hold)} · ${raekke(p).navn}</span></td><td class="n">${p.bedsteKamp}</td><td class="n">${p.pointIAlt}</td></tr>`).join('')}
     </tbody></table>
     ${btn(me ? 'hub' : 'spillere', 'Tilbage', 'ghost')}
   </div>`);
 }
 
 // ------------------------------------------------------------ kamp
-function startKamp(turnering = false) {
+/** Hvor meget sværhedsgraden er justeret automatisk for spilleren (-2 til +2 klassetrin). */
+const juster = (p) => (p.tilpas === false ? 0 : Math.max(-2, Math.min(2, p.justering | 0)));
+function kommentar(tekst) { if (me && me.kommentator !== false && me.lyd) sig(tekst); }
+
+function startKamp({ turnering = false, antal = 10 } = {}) {
   const t = turnering && me.turnering ? { ...RUNDER[me.turnering.runde], figur: me.turnering.hold[me.turnering.runde] } : null;
-  kamp = { nr: 0, rigtige: 0, stribe: 0, point: 0, svar: [], maal: 0, skud: [], laast: false, q: null, indtastet: '',
-    superskud: 0, turnering: t, dagKlaret: false };
+  kamp = { antal: t ? 10 : antal, nr: 0, rigtige: 0, stribe: 0, fejlStribe: 0, point: 0, svar: [], maal: 0, skud: [], laast: false, q: null,
+    indtastet: '', forsoeg: 0, fase: 'opgaver', superskud: 0, chancer: 0, turnering: t, dagKlaret: false, sigte: null, raekkeFoer: raekke(me).nr };
   world.startMatch(me.figur, kit(me), t ? { rival: t.figur, rivalKit: HOLD[t.figur] } : {});
   world.setUdstyr(udstyr(me), kit(me));
   lyd.floejte();
+  publikum(0.3);
+  if (!me.oplaesning) kommentar(`Velkommen til kampen. ${me.navn} har bolden.`);
   naesteOpgave();
 }
 function givPoint(n) {
@@ -253,57 +294,105 @@ function givPoint(n) {
   db.gem(me);
 }
 function hud() {
-  const dots = Array.from({ length: OPGAVER }, (_, i) =>
-    `<i class="${kamp.svar[i] === true ? 'ok' : kamp.svar[i] === false ? 'no' : i === kamp.nr ? 'now' : ''}"></i>`).join('');
+  if (kamp.duel) return duelHud();
+  const dots = Array.from({ length: kamp.antal }, (_, i) =>
+    `<i class="${kamp.svar[i] === true ? 'ok' : kamp.svar[i] === 'halv' ? 'halv' : kamp.svar[i] === false ? 'no' : i === kamp.nr ? 'now' : ''}"></i>`).join('');
   return `<div class="hud"><button class="quit" data-a="stop">Stop</button><div class="dots" aria-hidden="true">${dots}</div>
     <div class="score" id="score">${kamp.point} p</div></div>`;
 }
-function naesteOpgave() {
-  if (!kamp) return;
-  if (kamp.nr >= OPGAVER) return startFinale();
-  const q = kamp.q = lavOpgave(arter(me), me.klasse, me.niveau);
-  kamp.valg = me.klasse <= 3 ? svarmuligheder(q) : null;
-  kamp.indtastet = '';
-  kamp.laast = false;
-  kamp.start = performance.now();
+/** Tegn opgaven på måltavlen med svarmuligheder eller taltastatur. */
+function tegnOpgave(meta) {
+  const q = kamp.q;
   const svar = kamp.valg
     ? `<div class="choices">${kamp.valg.map((f, i) => `<button class="choice" data-a="svar" data-i="${i}">${fHtml(f, q.style)}</button>`).join('')}</div>`
     : `<div class="typed"><output id="ind" aria-live="polite"></output>${btn('indsend', 'Svar')}</div>
        <div class="pad">${['1', '2', '3', '4', '5', '6', '7', '8', '9', '0', ',', '−', '/', '⌫'].map((k) =>
     `<button data-a="tast" data-k="${k}" aria-label="${k === '⌫' ? 'Slet' : k === '/' ? 'Brøkstreg' : k}">${k}</button>`).join('')}</div>`;
   show('s-match', `<div class="top-group">${hud()}
-    <div class="board"><div class="meta"><span>Opgave ${kamp.nr + 1} af ${OPGAVER} · ${OPS[q.op]}</span>
+    <div class="board"><div class="meta"><span>${meta}</span>
       <button class="say" data-a="laesop">Læs op</button></div>
-      <div class="q" id="q">${q.html}</div><div class="flash" id="flash" aria-live="assertive"></div></div></div>
+      <div class="q" id="q">${q.html}</div><div class="hintbox" id="hint" hidden></div><div class="flash" id="flash" aria-live="assertive"></div></div></div>
     <div class="answers">${svar}</div>`);
+}
+function naesteOpgave() {
+  if (!kamp) return;
+  if (kamp.nr >= kamp.antal) return startFinale();
+  const q = kamp.q = lavOpgave(arter(me), me.klasse, me.niveau, juster(me));
+  kamp.valg = me.klasse <= 3 ? svarmuligheder(q) : null;
+  kamp.indtastet = '';
+  kamp.laast = false;
+  kamp.forsoeg = 0;
+  kamp.fase = 'opgaver';
+  kamp.start = performance.now();
+  tegnOpgave(`Opgave ${kamp.nr + 1} af ${kamp.antal} · ${OPS[q.op]}`);
   if (me.oplaesning) sig(q.say);
+}
+/** Automatisk sværhedsgrad: fem rigtige i træk gør opgaverne sværere, tre forkerte i træk gør dem lettere. */
+function tilpas(op) {
+  if (me.tilpas === false) return '';
+  const foer = juster(me);
+  me.justering = Math.max(-2, Math.min(2, foer + op));
+  if (me.justering === foer) return '';
+  return op > 0 ? ' Nu bliver opgaverne lidt sværere.' : ' Vi tager nogle lidt lettere opgaver.';
 }
 async function besvar(f, knap) {
   if (!kamp || kamp.laast) return;
   kamp.laast = true;
   stopTale();
-  const q = kamp.q;
+  const q = kamp.q, k = kamp;
   const rigtigt = same(f, q.answer);
   const flash = document.getElementById('flash');
+  // første forkerte svar: et hint og ét forsøg mere
+  if (!rigtigt && kamp.forsoeg === 0) {
+    kamp.forsoeg = 1;
+    kamp.stribe = 0;
+    kamp.fejlStribe++;
+    lyd.forkert();
+    publikum(0.25);
+    if (knap) { knap.classList.add('wrong'); knap.setAttribute('disabled', ''); }
+    let ekstra = '';
+    if (kamp.fejlStribe >= 3) { ekstra = tilpas(-1); kamp.fejlStribe = 0; db.gem(me); }
+    flash.className = 'flash no';
+    flash.textContent = 'Ikke helt. Prøv én gang til!';
+    const h = document.getElementById('hint');
+    h.innerHTML = `<b>Hint</b>${hint(q)}${ekstra ? `<small>${ekstra}</small>` : ''}`;
+    h.hidden = false;
+    if (!kamp.valg) { kamp.indtastet = ''; document.getElementById('ind').textContent = ''; }
+    kamp.laast = false;
+    return;
+  }
   ui.querySelectorAll('.answers button').forEach((b) => b.setAttribute('disabled', ''));
-  kamp.svar[kamp.nr] = rigtigt;
   if (rigtigt) {
-    kamp.rigtige++; kamp.stribe++;
-    const sek = (performance.now() - kamp.start) / 1000;
-    let p = { let: 8, mellem: 10, svaer: 12 }[me.niveau] + Math.min(kamp.stribe - 1, 5) * 2;
-    if (sek < (kamp.valg ? 6 : 10)) p += 3;
+    const foerste = kamp.forsoeg === 0;
+    kamp.rigtige++;
+    kamp.svar[kamp.nr] = foerste ? true : 'halv';
+    const grund = { let: 8, mellem: 10, svaer: 12 }[me.niveau];
+    let p, tekst;
+    if (foerste) {
+      kamp.stribe++; kamp.fejlStribe = 0;
+      const sek = (performance.now() - kamp.start) / 1000;
+      p = grund + Math.min(kamp.stribe - 1, 5) * 2 + (sek < (kamp.valg ? 6 : 10) ? 3 : 0);
+      tekst = `${['Flot!', 'Sådan!', 'Lige i krogen!', 'Stærkt!', 'Du er forbi!'][kamp.nr % 5]} +${p} p${kamp.stribe >= 3 ? ` · ${kamp.stribe} i træk` : ''}`;
+    } else {
+      p = Math.round(grund / 2);
+      tekst = `Der var den! +${p} p`;
+    }
     givPoint(p);
     lyd.rigtigt();
     knap?.classList.add('right');
-    const nytSuperskud = kamp.stribe % 5 === 0;
-    if (nytSuperskud) { kamp.superskud++; lyd.jubel(); }
+    if (foerste && kamp.stribe % 5 === 0) {
+      kamp.superskud++;
+      lyd.jubel();
+      tekst = `${kamp.stribe} i træk: superskud! +${p} p.${tilpas(1)}`;
+      kommentar(`${kamp.stribe} rigtige i træk. ${me.navn} får et superskud!`);
+    }
+    publikum(Math.min(1, 0.3 + kamp.stribe * 0.14));
     for (const [id, n, hoejest] of [['rigtige', 1], [q.op, 1], ['stribe', kamp.stribe, true]]) if (taelDag(me, id, n, hoejest)) kamp.dagKlaret = true;
     db.gem(me);
     flash.className = 'flash ok';
-    flash.innerHTML = nytSuperskud ? `${kamp.stribe} i træk: superskud til finalen! +${p} p`
-      : `${['Flot!', 'Sådan!', 'Lige i krogen!', 'Stærkt!', 'Du er forbi!'][kamp.nr % 5]} +${p} p${kamp.stribe >= 3 ? ` · ${kamp.stribe} i træk` : ''}`;
+    flash.textContent = tekst;
   } else {
-    kamp.stribe = 0;
+    kamp.svar[kamp.nr] = false;
     lyd.forkert();
     knap?.classList.add('wrong');
     if (kamp.valg) ui.querySelectorAll('.choice').forEach((b) => { if (same(kamp.valg[Number(b.dataset.i)], q.answer)) b.classList.add('right'); });
@@ -311,14 +400,18 @@ async function besvar(f, knap) {
     flash.innerHTML = `Svaret var ${fHtml(q.answer, q.style)}`;
   }
   document.getElementById('score').textContent = `${kamp.point} p`;
-  const k = kamp;
-  await Promise.all([world.matchStep(rigtigt), wait(rigtigt ? 1300 : 2400)]);
+  await Promise.all([world.matchStep(rigtigt), wait(rigtigt ? 1300 : 2200)]);
   if (kamp !== k) return;
   kamp.nr++;
+  // hvert tredje rigtige svar giver en chance med det samme
+  if (rigtigt && kamp.rigtige % 3 === 0 && kamp.nr < kamp.antal) {
+    await chance(k);
+    if (kamp !== k) return;
+  }
   naesteOpgave();
 }
 function tast(k) {
-  if (!kamp || kamp.laast || kamp.valg || !kamp.q) return;
+  if (!kamp || kamp.laast || kamp.valg || !kamp.q || kamp.fase !== 'opgaver') return;
   let s = kamp.indtastet;
   if (k === '⌫') s = s.slice(0, -1);
   else if (k === '−') s = s.startsWith('−') ? s.slice(1) : '−' + s;
@@ -330,74 +423,121 @@ function tast(k) {
   document.getElementById('ind').textContent = s;
 }
 function indsend() {
-  if (!kamp || kamp.laast || kamp.valg) return;
+  if (!kamp || kamp.laast || kamp.valg || kamp.fase !== 'opgaver') return;
   const f = laesSvar(kamp.indtastet);
   if (!f) { const fl = document.getElementById('flash'); fl.className = 'flash no'; fl.textContent = 'Skriv et tal først'; return; }
-  besvar(f, null);
+  (kamp.duel ? duelSvar : besvar)(f, null);
+}
+
+// ------------------------------------------------------------ skud på mål (chancer, finale og duel)
+function skudHud() {
+  if (kamp.duel) return duelHud();
+  const f = kamp.finale, t = kamp.turnering;
+  const midt = f
+    ? Array.from({ length: f.antal }, (_, i) => `<i class="${kamp.skud[i] === true ? 'goal' : kamp.skud[i] === false ? 'miss' : i === f.nr ? 'now' : ''}"></i>`).join('')
+    : '<span class="krav">Chance!</span>';
+  return `<div class="hud"><button class="quit" data-a="stop">Stop</button><div class="shots" aria-label="Skud">${midt}
+    ${t ? `<span class="krav">${kamp.maal} af ${t.krav} mål</span>` : ''}</div><div class="score">${kamp.point} p</div></div>`;
+}
+/** Vent på, at spilleren trykker i målet. tid = sekunder, før det er for sent (0 = ingen grænse). */
+function etSkud({ tekst, tid = 0, superOk = true, zone = null }) {
+  return new Promise((resolve) => {
+    const s = kamp.sigte = { klar: true, super: false, tekst, superOk, zone, resolve, timer: null };
+    tegnSigte();
+    if (tid) s.timer = setTimeout(() => { if (kamp?.sigte === s && s.klar) { s.klar = false; world.visSigte(null); resolve('forsent'); } }, tid * 1000);
+  });
+}
+function tegnSigte() {
+  const s = kamp.sigte;
+  const knap = s.superOk && kamp.superskud > 0
+    ? `<button class="superknap" data-a="superskud" aria-pressed="${s.super}">${s.super ? 'Superskud er klar' : `Brug superskud (${kamp.superskud})`}</button>` : '';
+  show('s-finale', `${skudHud()}<span></span><div class="bund">${knap}<div class="hint">${s.super ? 'Superskud: tryk i målet!' : s.tekst}</div></div>`);
+}
+async function affyr(x, y) {
+  const s = kamp?.sigte;
+  if (!s || !s.klar) return;
+  const pt = world.sigtepunkt(x, y);
+  if (!pt) return;
+  s.klar = false;
+  clearTimeout(s.timer);
+  const brugSuper = s.super && kamp.superskud > 0;
+  if (brugSuper) kamp.superskud--;
+  show('s-finale', `${skudHud()}<span></span><span></span>`);
+  s.resolve(await world.skyd(pt, () => lyd.spark(), brugSuper, s.zone));
+}
+/** Vis resultatet af et skud, og giv point og lyd. navn bruges af kommentatoren. */
+async function visSkud(res, k, navn = me.navn, giv = givPoint) {
+  const maal = res === 'maal';
+  if (maal) {
+    giv(MAAL_POINT); lyd.jubel(); publikum(1);
+    kommentar(`Mål! ${navn} scorer!`);
+  } else if (res === 'stolpe') { lyd.stolpe(); kommentar('Stolpen!'); } else { lyd.aah(); if (res === 'reddet') kommentar('Målmanden redder!'); }
+  const tekst = { maal: `Mååål!<small>+${MAAL_POINT} point</small>`, reddet: 'Reddet!', stolpe: 'Stolpen!', forbi: 'Forbi!', forsent: 'For sent!' }[res];
+  show('s-finale', `${skudHud()}<div class="shout ${maal ? '' : 'no'}">${tekst}</div><span></span>`);
+  await wait(maal ? 1900 : 1500);
+  if (kamp === k) publikum(0.3);
+}
+/** En chance midt i kampen: skiftevis et frispark og en friløber, hvor målmanden løber ud. */
+async function chance(k) {
+  const friloeber = k.chancer % 2 === 1;
+  k.chancer++;
+  k.fase = 'chance';
+  world.startChance(friloeber);
+  lyd.floejte();
+  publikum(0.7);
+  show('s-finale', `${skudHud()}<div class="shout">${friloeber ? 'Friløber!' : 'Frispark!'}<small>${friloeber ? 'Skyd, før målmanden når frem' : 'Tre rigtige giver et skud på mål'}</small></div><span></span>`);
+  await wait(1300);
+  if (kamp !== k) return;
+  const res = await etSkud({ tekst: friloeber ? 'Skynd dig: tryk i målet!' : 'Tryk i målet, dér hvor du vil skyde', tid: friloeber ? 5 : 0 });
+  if (kamp !== k) return;
+  if (res === 'forsent') world.goalie.play('cheer');
+  if (res === 'maal') { k.maal++; if (taelDag(me, 'maal')) k.dagKlaret = true; }
+  await visSkud(res, k);
+  if (kamp !== k) return;
+  world.slutChance();
 }
 
 // ------------------------------------------------------------ finale
 function startFinale() {
   const antal = Math.max(1, Math.ceil(kamp.rigtige / 2));
-  kamp.finale = { antal, nr: 0, klar: false, super: false };
+  kamp.finale = { antal, nr: 0 };
+  kamp.fase = 'finale';
   const t = kamp.turnering;
-  if (kamp.rigtige === OPGAVER) givPoint(PERFEKT_BONUS);
+  const bonus = kamp.antal >= 10 ? PERFEKT_BONUS : Math.round(PERFEKT_BONUS / 2);
+  const perfekt = kamp.svar.filter((s) => s === true).length === kamp.antal;
+  if (perfekt) givPoint(bonus);
   world.startFinale(me.figur, kit(me), t ? { rival: t.figur, klog: t.klog } : { klog: 0.3 + 0.025 * me.klasse });
   world.setUdstyr(udstyr(me), kit(me));
   lyd.floejte();
-  show('s-finale', `${finaleHud()}<div class="callout">
+  publikum(0.6);
+  show('s-finale', `${skudHud()}<div class="callout">
     <h2>Finalen</h2>
-    <p>Du fik ${kamp.rigtige} af ${OPGAVER} rigtige${kamp.rigtige === OPGAVER ? ` og ${PERFEKT_BONUS} bonuspoint` : ''}.
+    <p>Du fik ${kamp.rigtige} af ${kamp.antal} rigtige${perfekt ? ` og ${bonus} bonuspoint for en fejlfri kamp` : ''}.
     Det giver ${antal} skud på mål. Hvert mål giver ${MAAL_POINT} point.</p>
-    ${t ? `<p><b>${t.navn}: scor mindst ${t.krav} mål for at vinde over ${HOLD[t.figur].navn}.</b></p>` : ''}
+    ${t ? `<p><b>${t.navn}: du har ${kamp.maal} mål og skal have mindst ${t.krav} for at vinde over ${HOLD[t.figur].navn}.</b></p>` : ''}
     ${kamp.superskud ? `<p class="unlock">Du har ${kamp.superskud} superskud: en ildkugle, som målmanden ikke kan redde.</p>` : ''}
     ${btn('klar', 'Jeg er klar', 'big')}</div><span></span>`);
 }
-function finaleHud() {
-  const f = kamp.finale;
-  const balls = Array.from({ length: f.antal }, (_, i) =>
-    `<i class="${kamp.skud[i] === true ? 'goal' : kamp.skud[i] === false ? 'miss' : i === f.nr ? 'now' : ''}"></i>`).join('');
-  const t = kamp.turnering;
-  return `<div class="hud"><button class="quit" data-a="stop">Stop</button><div class="shots" aria-label="Skud">${balls}
-    ${t ? `<span class="krav">${kamp.maal} af ${t.krav} mål</span>` : ''}</div>
-    <div class="score">${kamp.point} p</div></div>`;
-}
-function finaleKlar() {
-  const f = kamp.finale;
-  f.klar = true;
-  const knap = kamp.superskud > 0 ? `<button class="superknap" data-a="superskud" aria-pressed="${f.super}">${f.super ? 'Superskud er klar' : `Brug superskud (${kamp.superskud})`}</button>` : '';
-  show('s-finale', `${finaleHud()}<span></span><div class="bund">${knap}
-    <div class="hint">${f.super ? 'Superskud: tryk i målet!' : `Skud ${f.nr + 1} af ${f.antal}: tryk i målet, dér hvor du vil skyde`}</div></div>`);
-}
-async function skyd(x, y) {
-  const f = kamp?.finale;
-  if (!f || !f.klar) return;
-  const pt = world.sigtepunkt(x, y);
-  if (!pt) return;
-  f.klar = false;
-  show('s-finale', `${finaleHud()}<span></span><span></span>`);
-  const k = kamp;
-  const brugSuper = f.super && kamp.superskud > 0;
-  if (brugSuper) { kamp.superskud--; f.super = false; }
-  const res = await world.skyd(pt, () => lyd.spark(), brugSuper);
-  if (kamp !== k) return;
-  const maal = res === 'maal';
-  kamp.skud[f.nr] = maal;
-  if (maal) { kamp.maal++; givPoint(MAAL_POINT); lyd.jubel(); if (taelDag(me, 'maal')) kamp.dagKlaret = true; db.gem(me); } else if (res === 'stolpe') lyd.stolpe(); else lyd.aah();
-  const tekst = { maal: `Mååål!<small>+${MAAL_POINT} point</small>`, reddet: 'Reddet!', stolpe: 'Stolpen!', forbi: 'Forbi!' }[res];
-  f.nr++;
-  show('s-finale', `${finaleHud()}<div class="shout ${maal ? '' : 'no'}">${tekst}</div><span></span>`);
-  await wait(maal ? 1900 : 1500);
-  if (kamp !== k) return;
-  if (f.nr >= f.antal) return skaermResultat();
-  world.resetSkud();
-  finaleKlar();
+async function finaleLoop() {
+  const k = kamp, f = k.finale;
+  while (f.nr < f.antal) {
+    world.resetSkud();
+    const res = await etSkud({ tekst: `Skud ${f.nr + 1} af ${f.antal}: tryk i målet, dér hvor du vil skyde` });
+    if (kamp !== k) return;
+    const maal = res === 'maal';
+    k.skud[f.nr] = maal;
+    f.nr++;
+    if (maal) { k.maal++; if (taelDag(me, 'maal')) k.dagKlaret = true; }
+    await visSkud(res, k);
+    if (kamp !== k) return;
+  }
+  skaermResultat();
 }
 
 function skaermResultat() {
   const k = kamp;
   const rekord = k.point > me.bedsteKamp && me.kampe > 0;
-  me.kampe++; me.maal += k.maal; me.rigtige += k.rigtige; me.besvaret += OPGAVER;
+  me.kampe++; me.maal += k.maal; me.rigtige += k.rigtige; me.besvaret += k.antal;
   me.bedsteKamp = Math.max(me.bedsteKamp, k.point);
   samling(me);
   me.pakker++;
@@ -413,6 +553,7 @@ function skaermResultat() {
         me.turneringer = (me.turneringer | 0) + 1;
         me.point += TURNERING_POINT; me.pointIAlt += TURNERING_POINT; me.pakker += 2;
         tur = `<p class="unlock">Du har vundet pokalturneringen! Turneringspokalen står nu i dit omklædningsrum, og du får ${TURNERING_POINT} point og to ekstra kortpakker.</p>`;
+        kommentar(`${me.navn} vinder pokalturneringen!`);
       } else {
         tur = `<p class="unlock">Sejr over ${HOLD[t.figur].navn}! Du er videre til ${RUNDER[me.turnering.runde].navn.toLowerCase()}n.</p><div class="row">${btn('turnering', 'Næste turneringskamp', 'big')}</div>`;
       }
@@ -422,26 +563,165 @@ function skaermResultat() {
     }
   }
   const nye = nyeFigurer(me);
+  const r = raekke(me);
+  const oprykket = r.nr > k.raekkeFoer;
+  if (oprykket) { lyd.jubel(); kommentar(`Oprykning! ${me.navn} spiller nu i ${r.navn}.`); }
   const gemt = db.gem(me);
   kamp = null;
+  publikum(0);
   hero(me);
-  world.player.play(k.rigtige >= 5 ? 'cheer' : 'idle');
+  world.player.play(k.rigtige >= k.antal / 2 ? 'cheer' : 'idle');
   const plads = db.topscore().findIndex((p) => p.id === me.id) + 1;
+  const andel = k.rigtige / k.antal;
   show('s-result', `<div class="panel">
-    <h1>${k.rigtige >= 8 ? 'Kæmpe kamp!' : k.rigtige >= 5 ? 'Godt spillet!' : 'Kampen er slut'}</h1>
+    <h1>${andel >= 0.8 ? 'Kæmpe kamp!' : andel >= 0.5 ? 'Godt spillet!' : 'Kampen er slut'}</h1>
+    ${oprykket ? `<p class="unlock">Oprykning! Du spiller nu i ${r.navn}.</p>` : ''}
     ${rekord ? '<p class="saved">Ny rekord: din bedste kamp indtil nu.</p>' : ''}
     ${tur}
     ${k.dagKlaret ? `<p class="unlock">Dagens udfordring klaret: ${DAG_POINT} point og en ekstra kortpakke.</p>` : ''}
     <div class="stats">
-      <div class="stat"><b>${k.rigtige}/${OPGAVER}</b><span>rigtige svar</span></div>
-      <div class="stat"><b>${k.maal}/${k.finale.antal}</b><span>mål i finalen</span></div>
+      <div class="stat"><b>${k.rigtige}/${k.antal}</b><span>rigtige svar</span></div>
+      <div class="stat"><b>${k.maal}</b><span>mål</span></div>
       <div class="stat"><b>+${k.point}</b><span>point</span></div>
     </div>
-    <p>Du har nu <b>${me.pointIAlt} point</b> og ligger nummer ${plads} på topscoren. Du har ${me.point} point at købe for i butikken.</p>
+    <p>Du har nu <b>${me.pointIAlt} point</b> og ligger nummer ${plads} på topscoren.</p>
+    ${maalHtml()}
     <p class="${gemt ? 'saved' : 'error'}">${gemt ? 'Dine point er gemt.' : 'Pointene kunne ikke gemmes på denne enhed.'}</p>
     ${nye.map((f) => `<p class="unlock">Ny figur låst op: ${FIGURER[f]}! Vælg den under „Ret spiller“.</p>`).join('')}
     <div class="row">${btn('pakke', me.pakker > 1 ? `Åbn dine kortpakker (${me.pakker})` : 'Åbn din kortpakke', 'big')}</div>
     <div class="row">${btn('spil', 'Spil igen', 'ghost')}${btn('butik', 'Butik', 'ghost')}${btn('top', 'Topscore', 'ghost')}${btn('hub', 'Omklædningsrum', 'ghost')}</div>
+  </div>`);
+}
+
+// ------------------------------------------------------------ to spillere på samme enhed
+function skaermDuelValg() {
+  const andre = db.profiler().filter((p) => p.id !== me.id);
+  hero(me);
+  show('s-profiles', `<div class="panel">
+    <h1>To spillere</h1>
+    <p>I skiftes til at svare på fem opgaver hver, med hver jeres klassetrin. Bagefter skyder I straffespark mod hinanden, og den anden er målmand.</p>
+    ${andre.length ? `<p class="muted">Hvem skal ${esc(me.navn)} spille mod?</p><div class="list">${andre.map((p) => kort(p, 'duel')).join('')}</div>`
+    : `<p class="unlock">Der skal være to spillere på denne enhed. Opret en spiller mere først.</p>${btn('ny', 'Ny spiller')}`}
+    ${btn('hub', 'Tilbage', 'ghost')}
+  </div>`);
+}
+async function startDuel(id) {
+  const b = db.profiler().find((p) => p.id === id);
+  if (!b) return skaermDuelValg();
+  try { await world.loadFigur(b.figur); } catch { return; }
+  kamp = { duel: { sp: [me, b], tur: 0, rigtige: [0, 0], maal: [0, 0], point: [0, 0] }, antal: 10, nr: 0, svar: [], point: 0, laast: false,
+    q: null, indtastet: '', forsoeg: 0, fase: 'opgaver', superskud: 0, sigte: null, zoneValg: null };
+  world.startMatch(me.figur, kit(me), { rival: b.figur, rivalKit: kit(b) });
+  world.setUdstyr(udstyr(me), kit(me));
+  lyd.floejte();
+  publikum(0.4);
+  duelOpgave();
+}
+function duelHud() {
+  const d = kamp.duel;
+  const side = (i) => `<span class="duelnavn ${kamp.fase === 'opgaver' && d.tur === i ? 'tur' : ''}" style="--c1:${d.sp[i].farve1}">${esc(d.sp[i].navn)}</span>`;
+  const tal = kamp.fase === 'opgaver' ? d.rigtige : d.maal;
+  return `<div class="hud"><button class="quit" data-a="stop">Stop</button><div class="duel">${side(0)}<b>${tal[0]} – ${tal[1]}</b>${side(1)}</div>
+    <div class="score">${kamp.fase === 'opgaver' ? 'rigtige' : 'mål'}</div></div>`;
+}
+function duelOpgave() {
+  const k = kamp, d = k.duel;
+  if (k.nr >= k.antal) return duelFinale();
+  d.tur = k.nr % 2;
+  const p = d.sp[d.tur];
+  const q = k.q = lavOpgave(arter(p), p.klasse, p.niveau, juster(p));
+  k.valg = p.klasse <= 3 ? svarmuligheder(q) : null;
+  k.indtastet = '';
+  k.laast = false;
+  tegnOpgave(`${esc(p.navn)}s tur · ${OPS[q.op]}`);
+  if (p.oplaesning) sig(q.say);
+}
+async function duelSvar(f, knap) {
+  const k = kamp, d = k.duel;
+  if (!k || k.laast) return;
+  k.laast = true;
+  stopTale();
+  const q = k.q, rigtigt = same(f, q.answer);
+  ui.querySelectorAll('.answers button').forEach((b) => b.setAttribute('disabled', ''));
+  const flash = document.getElementById('flash');
+  if (rigtigt) {
+    d.rigtige[d.tur]++; d.point[d.tur] += 10;
+    lyd.rigtigt(); knap?.classList.add('right');
+    flash.className = 'flash ok'; flash.textContent = `Rigtigt, ${d.sp[d.tur].navn}!`;
+  } else {
+    lyd.forkert(); knap?.classList.add('wrong');
+    if (k.valg) ui.querySelectorAll('.choice').forEach((b) => { if (same(k.valg[Number(b.dataset.i)], q.answer)) b.classList.add('right'); });
+    flash.className = 'flash no'; flash.innerHTML = `Svaret var ${fHtml(q.answer, q.style)}`;
+  }
+  // spiller 1 dribler frem ved rigtigt svar; spiller 2 erobrer bolden ved sit rigtige svar
+  await Promise.all([rigtigt ? world.matchStep(d.tur === 0) : wait(0), wait(rigtigt ? 1300 : 2200)]);
+  if (kamp !== k) return;
+  k.nr++;
+  duelOpgave();
+}
+function duelFinale() {
+  const k = kamp, d = k.duel;
+  k.fase = 'finale';
+  d.antal = d.rigtige.map((r) => Math.max(1, Math.ceil(r / 2)));
+  lyd.floejte();
+  show('s-finale', `${duelHud()}<div class="callout">
+    <h2>Straffespark</h2>
+    <p>${esc(d.sp[0].navn)} fik ${d.rigtige[0]} rigtige og har ${d.antal[0]} skud. ${esc(d.sp[1].navn)} fik ${d.rigtige[1]} rigtige og har ${d.antal[1]} skud.</p>
+    <p>Den, der ikke skyder, er målmand og vælger i hemmelighed, hvor han kaster sig.</p>
+    ${btn('duelKlar', 'Vi er klar', 'big')}</div><span></span>`);
+}
+function vaelgZone(vogter, skytte) {
+  return new Promise((resolve) => {
+    kamp.zoneValg = resolve;
+    show('s-finale', `${duelHud()}<div class="callout">
+      <h2>${esc(vogter.navn)} er målmand</h2>
+      <p>Vælg, hvor du kaster dig. ${esc(skytte.navn)} må ikke kigge!</p>
+      <div class="row" style="justify-content:center">${btn('zone', 'Venstre', '', 'data-v="1"')}${btn('zone', 'Midten', '', 'data-v="0"')}${btn('zone', 'Højre', '', 'data-v="-1"')}</div>
+    </div><span></span>`);
+  });
+}
+async function duelLoop() {
+  const k = kamp, d = k.duel;
+  for (let r = 0; r < Math.max(...d.antal); r++) {
+    for (const i of [0, 1]) {
+      if (r >= d.antal[i]) continue;
+      const skytte = d.sp[i], vogter = d.sp[1 - i];
+      world.startFinale(skytte.figur, kit(skytte), { rival: vogter.figur, keeperKit: kit(vogter) });
+      world.setUdstyr(udstyr(skytte), kit(skytte));
+      const zone = await vaelgZone(vogter, skytte);
+      if (kamp !== k) return;
+      const res = await etSkud({ tekst: `${esc(skytte.navn)}: tryk i målet, dér hvor du vil skyde`, superOk: false, zone });
+      if (kamp !== k) return;
+      if (res === 'maal') d.maal[i]++;
+      await visSkud(res, k, skytte.navn, (n) => { d.point[i] += n; });
+      if (kamp !== k) return;
+    }
+  }
+  duelResultat();
+}
+function duelResultat() {
+  const d = kamp.duel;
+  const vinder = d.maal[0] !== d.maal[1] ? (d.maal[0] > d.maal[1] ? 0 : 1) : d.rigtige[0] !== d.rigtige[1] ? (d.rigtige[0] > d.rigtige[1] ? 0 : 1) : -1;
+  d.sp.forEach((p, i) => {
+    if (vinder === i) d.point[i] += 50;
+    p.point += d.point[i]; p.pointIAlt += d.point[i];
+    p.kampe++; p.maal += d.maal[i]; p.rigtige += d.rigtige[i]; p.besvaret += 5;
+    nyeFigurer(p);
+    db.gem(p);
+  });
+  const modstander = d.sp[1];
+  kamp = null;
+  publikum(0);
+  hero(vinder === 1 ? modstander : me);
+  world.player.play('cheer');
+  if (vinder >= 0) kommentar(`${d.sp[vinder].navn} vinder duellen!`);
+  show('s-result', `<div class="panel">
+    <h1>${vinder < 0 ? 'Uafgjort!' : `${esc(d.sp[vinder].navn)} vinder!`}</h1>
+    <div class="list">${d.sp.map((p, i) => `<div class="item ${vinder === i ? 'on' : ''}"><span><b>${esc(p.navn)}</b><small>${d.rigtige[i]} rigtige · ${d.maal[i]} mål</small></span>
+      <span class="inuse">+${d.point[i]} p</span></div>`).join('')}</div>
+    <p class="muted">${vinder < 0 ? 'Lige mange mål og lige mange rigtige svar.' : 'Vinderen får 50 point ekstra.'} Pointene er gemt hos jer begge.</p>
+    <div class="row">${btn('duel', 'Omkamp', 'big', `data-id="${modstander.id}"`)}</div>
+    <div class="row">${btn('hub', 'Omklædningsrum', 'ghost')}</div>
   </div>`);
 }
 
@@ -503,7 +783,8 @@ function skaermButik(besked = '', scroll = 0) {
   world.showHero(me.figur, k2);
   world.setUdstyr(vis, k2);
   if (proeve?.k === 'jubel') world.player.play('cheer');
-  if (proeve?.k === 'tilskuere' && vis.tilskuere >= 3) world.fyrStart(-9);
+  if (proeve?.k === 'tilskuere' && vis.tilskuere === 8) world.fyrStart(-9);
+  if (proeve?.k === 'tilskuere' && vis.tilskuere === 7) world.konfettiStart(-4);
   const koebKnap = (a, k, id, pris) => (me.point >= pris
     ? `<button class="buy" data-a="${a}" data-k="${k}" data-id="${id}">Køb · ${pris} p</button>`
     : `<span class="need">${pris} p<br>mangler ${pris - me.point}</span>`);
@@ -512,11 +793,14 @@ function skaermButik(besked = '', scroll = 0) {
     return `<button class="buy use" data-a="proev" data-k="${k}" data-id="${id}" aria-pressed="${!!aktiv}">${aktiv ? 'Vises' : 'Se'}</button>`;
   };
   const trin = Object.entries(TRIN).map(([k, kat]) => {
-    const naeste = kat.trin[o[k] + 1];
+    const naeste = kat.trin[o[k] + 1], krav = kraeverTekst(me, k);
+    const prikker = kat.trin.map((_, i) => `<i class="${i <= o[k] ? 'ok' : ''}"></i>`).join('');
     return `<section class="shop"><h2>${kat.navn}</h2>
-      <p class="muted">Du har: ${kat.trin[o[k]].navn} (${o[k]} af ${kat.trin.length - 1})</p>
-      ${naeste ? `<div class="item"><span><b>${naeste.navn}</b><small>${naeste.tekst}</small></span><span class="acts">${seKnap(k, '')}${koebKnap('koebTrin', k, '', naeste.pris)}</span></div>`
-    : '<p class="saved">Du har købt det hele her.</p>'}</section>`;
+      <div class="levels" aria-hidden="true">${prikker}</div>
+      <p class="muted">Level ${o[k] + 1} af ${kat.trin.length}: ${kat.trin[o[k]].navn}</p>
+      ${!naeste ? '<p class="saved">Du har nået det højeste level.</p>'
+    : `<div class="item"><span><b>Level ${o[k] + 2}: ${naeste.navn}</b><small>${naeste.tekst}</small></span><span class="acts">${seKnap(k, '')}${
+      krav ? `<span class="need">Kræver<br>${krav}</span>` : koebKnap('koebTrin', k, '', naeste.pris)}</span></div>`}</section>`;
   }).join('');
   const valg = Object.entries(VALG).map(([k, kat]) => `<section class="shop"><h2>${kat.navn}</h2>
     ${Object.entries(kat.ting).map(([id, t]) => {
@@ -529,7 +813,7 @@ function skaermButik(besked = '', scroll = 0) {
   show('s-shop', `<div class="panel">
     <div class="row spread"><h1>Butik</h1><span class="wallet">${me.point} p</span></div>
     <p class="${proeveNavn ? 'unlock' : besked ? 'saved' : 'muted'}" aria-live="polite">${info}</p>
-    ${valg}${trin}
+    ${trin}${valg}
     ${btn('hub', 'Tilbage', 'ghost')}
   </div>`);
   ui.firstElementChild.scrollTop = scroll;
@@ -573,9 +857,9 @@ const handlinger = {
   },
   spilTurnering: async () => {
     try { await world.loadFigur(me.turnering.hold[me.turnering.runde]); } catch { return; }
-    startKamp(true);
+    startKamp({ turnering: true });
   },
-  superskud: () => { const f = kamp?.finale; if (f?.klar && kamp.superskud > 0) { f.super = !f.super; finaleKlar(); } },
+  superskud: () => { const s = kamp?.sigte; if (s?.klar && kamp.superskud > 0) { s.super = !s.super; tegnSigte(); } },
   indstillinger: () => skaermIndstil(),
   grafik: async (el) => {
     try { localStorage.setItem(GRAFIK, el.dataset.v); if (el.dataset.v !== 'auto') localStorage.removeItem(GRAFIK + '.maalt'); } catch { /* ingen lagring */ }
@@ -600,10 +884,15 @@ const handlinger = {
     el.dataset.sikker = '1'; el.classList.add('danger'); el.classList.remove('ghost');
     el.firstElementChild.textContent = 'Tryk igen for at slette';
   },
-  indstil: (el) => { me[el.dataset.k] = el.dataset.v; db.gem(me); skaermIndstil(ui.firstElementChild.scrollTop); },
-  klasse: (el) => { me.klasse = Math.max(0, Math.min(10, me.klasse + Number(el.dataset.v))); db.gem(me); skaermIndstil(ui.firstElementChild.scrollTop); },
-  skift: (el) => { me[el.dataset.k] = !me[el.dataset.k]; db.gem(me); setLyd(me.lyd); skaermIndstil(ui.firstElementChild.scrollTop); },
+  indstil: (el) => { me[el.dataset.k] = el.dataset.v; me.justering = 0; db.gem(me); skaermIndstil(ui.firstElementChild.scrollTop); },
+  klasse: (el) => { me.klasse = Math.max(0, Math.min(10, me.klasse + Number(el.dataset.v))); me.justering = 0; db.gem(me); skaermIndstil(ui.firstElementChild.scrollTop); },
+  skift: (el) => { const felt = el.dataset.k; me[felt] = ['tilpas', 'kommentator'].includes(felt) ? me[felt] === false : !me[felt]; db.gem(me); setLyd(me.lyd); skaermIndstil(ui.firstElementChild.scrollTop); },
   spil: () => startKamp(),
+  hurtig: () => startKamp({ antal: 5 }),
+  toSpillere: () => skaermDuelValg(),
+  duel: (el) => startDuel(el.dataset.id),
+  duelKlar: () => duelLoop(),
+  zone: (el) => { const r = kamp?.zoneValg; if (r) { kamp.zoneValg = null; r(Number(el.dataset.v)); } },
   top: () => skaermTop(),
   butik: () => { proeve = null; skaermButik(); },
   koebTrin: (el) => { const k = el.dataset.k; const ok = koebTrin(me, k); handel(ok, ok ? `Købt: ${TRIN[k].trin[udstyr(me)[k]].navn}` : ''); },
@@ -618,12 +907,12 @@ const handlinger = {
   hub: () => skaermHub(),
   ret: () => nyDraft(me),
   spillere: () => skaermSpillere(),
-  stop: () => skaermHub(),
+  stop: () => { publikum(0); skaermHub(); },
   laesop: () => kamp?.q && sig(kamp.q.say),
-  svar: (el) => besvar(kamp.valg[Number(el.dataset.i)], el),
+  svar: (el) => (kamp.duel ? duelSvar : besvar)(kamp.valg[Number(el.dataset.i)], el),
   tast: (el) => tast(el.dataset.k),
   indsend: () => indsend(),
-  klar: () => finaleKlar(),
+  klar: () => finaleLoop(),
 };
 ui.addEventListener('click', (e) => {
   const el = e.target.closest('[data-a]');
@@ -643,7 +932,7 @@ ui.addEventListener('input', (e) => {
   if (el.dataset.k === 'nummer') hero(draft);
 });
 window.addEventListener('keydown', (e) => {
-  if (!kamp || kamp.laast || !kamp.q || kamp.finale) return;
+  if (!kamp || kamp.laast || !kamp.q || kamp.fase !== 'opgaver') return;
   if (kamp.valg) {
     const i = ['1', '2', '3', '4'].indexOf(e.key);
     if (i >= 0) ui.querySelectorAll('.choice')[i]?.click();
@@ -657,9 +946,9 @@ window.addEventListener('keydown', (e) => {
   else if (e.key === 'Enter') { e.preventDefault(); indsend(); }
 });
 stage.addEventListener('pointermove', (e) => {
-  if (kamp?.finale?.klar && e.pointerType === 'mouse') world.visSigte(world.sigtepunkt(e.clientX, e.clientY));
+  if (kamp?.sigte?.klar && e.pointerType === 'mouse') world.visSigte(world.sigtepunkt(e.clientX, e.clientY));
 });
-stage.addEventListener('pointerdown', (e) => { if (kamp?.finale?.klar) skyd(e.clientX, e.clientY); });
+stage.addEventListener('pointerdown', (e) => { if (kamp?.sigte?.klar) affyr(e.clientX, e.clientY); });
 
 // ------------------------------------------------------------ start
 (async function start() {

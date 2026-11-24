@@ -230,3 +230,20 @@ table.top { width: 100%; border-collapse: collapse; }
 .tile b { font: 800 italic 1.5rem/1 var(--display); text-transform: uppercase; }
 .tile small { color: #a9b8d0; }
 .s-settings h2 { font-size: 1.5rem; margin-top: 4px; color: var(--flood); }
+
+/* ---------- hints, levels, duel ---------- */
+.dots i.halv { background: var(--flood); }
+.hintbox { margin: 6px auto 0; max-width: 34em; background: #12233f; border-left: 6px solid var(--flood); padding: 8px 12px; text-align: left;
+  color: var(--chalk); font-size: 1rem; line-height: 1.35; }
+.hintbox b { display: block; color: var(--flood); font-size: 0.85rem; }
+.hintbox small { display: block; color: #a9b8d0; margin-top: 4px; }
+.prikker { display: block; font-size: 1.5rem; letter-spacing: 0.12em; color: var(--flood); line-height: 1.2; }
+.levels { display: flex; gap: 4px; }
+.levels i { flex: 1; height: 10px; background: #2a426b; transform: skewX(-14deg); }
+.levels i.ok { background: var(--flood); }
+.dag span { display: block; }
+.duel { flex: 1; display: flex; align-items: center; justify-content: center; gap: 12px; font-weight: 800; }
+.duel b { font: 800 italic 1.9rem/1 var(--display); color: var(--flood); white-space: nowrap; }
+.duelnavn { padding: 4px 10px; border-bottom: 5px solid var(--c1); opacity: 0.65; }
+.duelnavn.tur { opacity: 1; background: var(--night-2); }
+.shout small { font-size: 0.26em; }

@@ -1,26 +1,44 @@
 // Butikken: hvad man kan købe for sine point, og hvad spilleren ejer og bruger.
 
-/** Ting man køber ét trin ad gangen. Første trin har man fra start. */
+/** Ting man opgraderer i ti levels. Level 1 har man fra start; hvert level gør det større og flottere. */
+const trin = (navne, priser) => navne.map(([navn, tekst], i) => ({ navn, tekst, pris: priser[i] }));
 export const TRIN = {
-  stadion: { navn: 'Stadion', trin: [
-    { navn: 'Træningsbanen' },
-    { navn: 'Projektører', pris: 600, tekst: 'Fire høje lysmaster rundt om banen' },
-    { navn: 'Store tribuner', pris: 1500, tekst: 'Plads til tusindvis af tilskuere' },
-    { navn: 'Tag over tribunerne', pris: 3000, tekst: 'Nu er det et rigtigt stadion' },
-  ] },
-  tilskuere: { navn: 'Tilskuere og maskot', trin: [
-    { navn: 'Stille tribuner' },
-    { navn: 'Maskotten Ørni', pris: 750, tekst: 'En stor gul fugl, der hepper på dig' },
-    { navn: 'Flag i dine farver', pris: 1200, tekst: 'Fansene hejser dit holds flag' },
-    { navn: 'Fyrværkeri ved mål', pris: 2000, tekst: 'Himlen lyser op, når du scorer' },
-  ] },
-  pokaler: { navn: 'Pokalskab', trin: [
-    { navn: 'Tomt bord' },
-    { navn: 'Bronzepokalen', pris: 900, tekst: 'Din første pokal' },
-    { navn: 'Sølvpokalen', pris: 1800, tekst: 'Blank som en ny bold' },
-    { navn: 'Guldpokalen', pris: 3500, tekst: 'Kun for de bedste' },
-    { navn: 'Mesterpokalen', pris: 7500, tekst: 'Den største af dem alle' },
-  ] },
+  stadion: { navn: 'Stadion', trin: trin([
+    ['Græsbanen', 'En bane, to mål og et par træer'],
+    ['Bander', 'Reklamebander hele vejen rundt om banen'],
+    ['Tribuner på langsiderne', 'De første tilskuerpladser'],
+    ['Tribuner bag målene', 'Nu er der tribuner hele vejen rundt'],
+    ['Projektører', 'Fire høje lysmaster til aftenkampe'],
+    ['Store tribuner på langsiderne', 'Plads til tusindvis af tilskuere'],
+    ['Store tribuner bag målene', 'Et stadion i to etager'],
+    ['Tag over tribunerne', 'Nu sidder alle i tørvejr'],
+    ['Storskærm', 'En kæmpe skærm tårner sig op bag målet'],
+    ['Mesterbuen', 'En hvid bue hen over hele stadion'],
+  ], [0, 300, 600, 900, 1300, 1800, 2400, 3200, 4500, 6000]) },
+  tilskuere: { navn: 'Tilskuere og stemning', kraever: { stadion: 2 }, trin: trin([
+    ['Tomme tribuner', 'Der er ingen kommet endnu'],
+    ['De første tilskuere', 'En lille flok har fundet vej'],
+    ['Halvfyldte tribuner', 'Rygtet om dit hold breder sig'],
+    ['Fuldt hus', 'Alle pladser er optaget'],
+    ['Maskotten Ørni', 'En stor gul fugl, der hepper på dig'],
+    ['Flag i dine farver', 'Fansene hejser dit holds flag'],
+    ['Kæmpebannere', 'Store bannere i holdets farver på tribunerne'],
+    ['Konfettiregn', 'Meget mere konfetti, når du scorer'],
+    ['Fyrværkeri', 'Himlen lyser op ved hvert mål'],
+    ['Lysshow', 'Lyskegler fejer hen over stadion'],
+  ], [0, 200, 400, 700, 1000, 1400, 1900, 2500, 3300, 4500]) },
+  pokaler: { navn: 'Pokalrum', trin: trin([
+    ['Tomt podie', 'Her er plads til ni pokaler'],
+    ['Kobberpokalen', 'Din første pokal'],
+    ['Bronzepokalen', 'Lidt større end den første'],
+    ['Jernpokalen', 'Tung og sej'],
+    ['Sølvpokalen', 'Blank som en ny bold'],
+    ['Stålpokalen', 'Den holder til det hele'],
+    ['Perlepokalen', 'Den skinner helt hvidt'],
+    ['Guldpokalen', 'Kun for de bedste'],
+    ['Rosenguldpokalen', 'Sjælden og flot'],
+    ['Mesterpokalen', 'Den største af dem alle'],
+  ], [0, 300, 500, 800, 1200, 1700, 2300, 3000, 4000, 6000]) },
 };
 
 /** Ting man ejer flere af og vælger imellem. */
@@ -57,6 +75,13 @@ export const VALG = {
 /** Spillerens udstyr med standardværdier (ældre gemte spillere mangler felterne). */
 export function udstyr(p) {
   const o = (p.opgraderinger ||= {});
+  if (!o.v) {   // spillere gemt før de ti levels: oversæt de gamle trin til de nye
+    const haft = Object.keys(o).length > 0;
+    o.stadion = haft ? [3, 4, 6, 7][o.stadion | 0] ?? 3 : 0;
+    o.tilskuere = haft ? [3, 4, 5, 8][o.tilskuere | 0] ?? 3 : 0;
+    o.pokaler = haft ? (o.pokaler | 0) : 0;
+    o.v = 2;
+  }
   for (const k of Object.keys(TRIN)) o[k] = Math.max(0, Math.min(TRIN[k].trin.length - 1, o[k] | 0));
   o.ejet ||= {};
   o.valgt ||= {};
@@ -68,12 +93,19 @@ export function udstyr(p) {
   }
   return o;
 }
+/** Mangler spilleren noget for at kunne købe videre i en kategori? Giver fx 'Stadion level 3' eller ''. */
+export function kraeverTekst(p, k) {
+  const o = udstyr(p), krav = TRIN[k].kraever;
+  if (!krav) return '';
+  for (const [kat, lvl] of Object.entries(krav)) if (o[kat] < lvl) return `${TRIN[kat].navn} level ${lvl + 1}`;
+  return '';
+}
 
 /** Køb næste trin. Giver true, hvis købet gik igennem. */
 export function koebTrin(p, k) {
   const o = udstyr(p);
   const naeste = TRIN[k].trin[o[k] + 1];
-  if (!naeste || p.point < naeste.pris) return false;
+  if (!naeste || p.point < naeste.pris || kraeverTekst(p, k)) return false;
   p.point -= naeste.pris;
   o[k]++;
   return true;

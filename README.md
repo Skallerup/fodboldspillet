@@ -58,10 +58,18 @@ python3 tools/blender/build_assets.py --lite     # lette udgaver af figurerne ti
 python3 tools/blender/rhino_player.py --render   # detaljeret næsehorn til nærbilleder
 ```
 
+## Kampen
+
+- Svarer man forkert, får man et hint og ét forsøg mere.
+- Sværhedsgraden følger barnet: fem rigtige i træk gør opgaverne lidt sværere, tre forkerte gør dem lidt lettere.
+- Hvert tredje rigtige svar giver en chance med det samme: et frispark eller en friløber.
+- Man kan spille en hurtig kamp på fem opgaver, eller to spillere mod hinanden på samme enhed.
+- Point giver oprykning gennem ti rækker, fra Serie 3 til verdensmester.
+
 ## Butikken
 
 Point bruges i butikken på: trøjemønstre, bolde, støvler, målfejringer, stadion (projektører, store tribuner, tag),
-tilskuere (maskotten Ørni, flag i holdets farver, fyrværkeri) og pokaler. Kataloget og priserne står i `src/shop.js`.
+tilskuere og pokaler. Stadion, tilskuere og pokalrum har ti levels hver, og hvert level gør det større og flottere. Kataloget og priserne står i `src/shop.js`.
 
 ## Samlekort og hemmelige figurer
 
