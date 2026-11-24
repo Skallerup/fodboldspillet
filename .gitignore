@@ -1,0 +1,7 @@
+# Genereres af Blender-scripts
+assets/textures/
+assets/previews/
+__pycache__/
+node_modules/
+.DS_Store
+.vercel
