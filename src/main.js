@@ -176,10 +176,10 @@ function skaermHub() {
   const valgt = arter(me);
   const arterTekst = valgt.length === Object.keys(OPS).length ? 'Alle regnearter' : valgt.map((v) => OPS[v]).join(', ');
   show('s-hub', `<div class="panel">
-    <div class="card" style="--c1:${me.farve1};--c2:${me.farve2}">
+    <button class="card" data-a="spillere" style="--c1:${me.farve1};--c2:${me.farve2}" aria-label="Skift spiller. Nu: ${esc(me.navn)}">
       <span class="badge">${esc(me.nummer)}</span>
       <span><b>${esc(me.navn)}</b><small>${esc(me.hold)} · ${raekke(me).navn}</small></span>
-      <span class="pts">${me.pointIAlt} p</span></div>
+      <span class="pts">${me.pointIAlt} p<small class="skift">Skift spiller</small></span></button>
     ${btn('spil', 'Spil kamp', 'big wide')}
     <div class="row">${btn('hurtig', 'Hurtig kamp · 5 opgaver', 'ghost')}${btn('toSpillere', 'To spillere', 'ghost')}</div>
     <button class="summary" data-a="indstillinger"><span><b>${klasseNavn(me.klasse)} · ${NIVEAU_NAVN[me.niveau]}</b><small>${arterTekst}</small></span><span class="inuse">Skift</span></button>

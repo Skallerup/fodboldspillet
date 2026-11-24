@@ -247,3 +247,4 @@ table.top { width: 100%; border-collapse: collapse; }
 .duelnavn { padding: 4px 10px; border-bottom: 5px solid var(--c1); opacity: 0.65; }
 .duelnavn.tur { opacity: 1; background: var(--night-2); }
 .shout small { font-size: 0.26em; }
+.card .skift { display: block; font: 800 0.8rem/1.3 var(--body); color: var(--chalk); text-align: right; text-decoration: underline; }
