@@ -5,7 +5,7 @@ Dansk 3D-matematikspil til børn (0.-10. klasse) med fodboldtema. Statisk hjemme
 ## Kommandoer
 
 - Kør lokalt: `python3 -m http.server 8000`
-- Test: `node tests/math.test.mjs` og `node tests/daily.test.mjs`
+- Test: `node tests/math.test.mjs`, `node tests/daily.test.mjs` og `node tests/stats.test.mjs`
 - Byg modeller: `python3 tools/blender/build_assets.py [--render] [--cards]` og derefter `python3 tools/blender/build_assets.py --lite` (kræver Blender 5.x eller `pip install bpy`)
 
 ## Arkitektur
@@ -56,6 +56,11 @@ Dansk 3D-matematikspil til børn (0.-10. klasse) med fodboldtema. Statisk hjemme
 - Point: mål i finalen giver `MAAL_POINT` (25), mål fra chancer `CHANCE_POINT` (15).
 - Tilskuere level 10 er en aftenkamp (`World.setAften`): mørk himmel, dæmpet lys og farvede lyspletter på græsset (`lysPletter`).
 - `World.fart` spoler animationerne frem og bruges kun i test.
+
+## Til forældre og lærere
+
+- `src/stats.js`: `noter(p, q, udfald, sek)` kaldes for hver færdig opgave (`'foerste'`, `'andet'` efter hint, `'forkert'`) fra `besvar` og `duelSvar`. Gemmes i `p.stat`: pr. regneart, pr. dag (60 dage) og de 12 seneste opgaver, der blev forkerte i begge forsøg.
+- `overblik(p)` regner tallene til siden `skaermVoksen` (Indstillinger → Til forældre og lærere), som også kan udskrives. Test: `node tests/stats.test.mjs`.
 
 ## Grafik og indstillinger
 

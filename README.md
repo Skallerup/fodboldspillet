@@ -44,6 +44,7 @@ python3 -m http.server 8000
 ```
 node tests/math.test.mjs
 node tests/daily.test.mjs
+node tests/stats.test.mjs
 ```
 
 ## Byg 3D-modellerne igen
@@ -65,6 +66,12 @@ python3 tools/blender/rhino_player.py --render   # detaljeret næsehorn til nær
 - Hvert tredje rigtige svar giver en chance med det samme: et frispark eller en friløber.
 - Man kan spille en hurtig kamp på fem opgaver, eller to spillere mod hinanden på samme enhed.
 - Point giver oprykning gennem ti rækker, fra Serie 3 til verdensmester.
+
+## Til forældre og lærere
+
+Under Indstillinger ligger en side, der viser, hvordan det går: rigtige svar pr. regneart (i første forsøg, efter hint og forkert),
+tid pr. opgave, opgaver pr. dag den seneste uge og de opgaver, der drillede. Siden giver et par forslag og kan udskrives.
+Tallene gemmes kun på enheden.
 
 ## Butikken
 

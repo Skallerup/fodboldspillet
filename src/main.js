@@ -5,6 +5,7 @@ import { lavOpgave, svarmuligheder, laesSvar, hint, html as fHtml, same, OPS } f
 import { lyd, setLyd, sig, stopTale, publikum } from './audio.js';
 import { TRIN, VALG, LAASE, erLaastOp, udstyr, kraeverTekst, koebTrin, koebTing, brugTing } from './shop.js';
 import { dagens, taelDag, DAG_POINT } from './daily.js';
+import { noter, overblik } from './stats.js';
 import { hentKort, alleKort, samling, antalKort, traekKort, SJAELDENHED } from './cards.js';
 
 const ui = document.getElementById('ui');
@@ -230,11 +231,52 @@ function skaermIndstil(scroll = 0) {
     <p class="muted">${g === 'auto' ? `Spillet vælger selv. Lige nu: ${world.lav ? 'hurtig' : 'flot'} grafik.` : 'Vælg „Hurtig“, hvis spillet hakker.'}</p>
     <h2>Spiller</h2>
     <div class="row">${btn('ret', 'Ret spiller', 'ghost')}${btn('spillere', 'Skift spiller', 'ghost')}</div>
+    <div class="row">${btn('voksen', 'Til forældre og lærere', 'ghost')}</div>
     <p class="muted">Kampe: ${me.kampe} · Mål: ${me.maal} · Bedste kamp: ${me.bedsteKamp} p${me.turneringer ? ` · Turneringer vundet: ${me.turneringer}` : ''}</p>
     ${btn('hub', 'Tilbage', 'ghost')}
   </div>`);
   ui.firstElementChild.scrollTop = scroll;
 }
+// ------------------------------------------------------------ til forældre og lærere
+function skaermVoksen() {
+  const o = overblik(me);
+  const mærke = { staerk: ['Stærk', 'god'], ok: ['På vej', ''], oev: ['Øv mere', 'svag'], faa: ['For få opgaver', 'graa'] };
+  const maksDag = Math.max(1, ...o.dage.map((d) => d.n));
+  const raad = [];
+  if (o.svagest) raad.push(`${esc(me.navn)} har sværest ved ${o.svagest.navn.toLowerCase()}: ${o.svagest.foerste} % rigtige i første forsøg. Vælg kun ${o.svagest.navn.toLowerCase()} under indstillinger i en periode, eller sæt niveauet til let.`);
+  if (o.staerkest) raad.push(`${o.staerkest.navn} sidder godt fast (${o.staerkest.foerste} %). Prøv niveauet svær eller et klassetrin højere.`);
+  if (o.n && o.efterHint >= 15) raad.push(`${o.efterHint} % af opgaverne løses efter et hint. Det er et godt tegn: hintene bliver brugt.`);
+  if (!raad.length) raad.push(o.n < 20 ? 'Der er endnu for få opgaver til at sige noget sikkert. Kig igen efter et par kampe.' : 'Ingen regneart skiller sig ud. Sværhedsgraden ser ud til at passe.');
+  show('s-voksen', `<div class="panel wide voksen">
+    <h1>Til forældre og lærere</h1>
+    <p><b>${esc(me.navn)}</b> spiller på ${klasseNavn(me.klasse)}, niveau ${NIVEAU_NAVN[me.niveau].toLowerCase()}${
+    me.tilpas === false ? ', uden automatisk tilpasning' : juster(me) ? `, og spillet har lige nu justeret ${juster(me) > 0 ? 'op' : 'ned'} med ${Math.abs(juster(me))} klassetrin` : ''}.</p>
+    <div class="stats fire">
+      <div class="stat"><b>${o.n}</b><span>opgaver</span></div>
+      <div class="stat"><b>${o.foerste} %</b><span>rigtige i første forsøg</span></div>
+      <div class="stat"><b>${o.minutter}</b><span>minutter på opgaver</span></div>
+      <div class="stat"><b>${o.spilledage}</b><span>dage med spil</span></div>
+    </div>
+    <h2>Regnearter</h2>
+    <table class="top voksentabel"><thead><tr><th>Regneart</th><th class="n">Opgaver</th><th>Første forsøg · efter hint · forkert</th><th class="n">Sek.</th><th></th></tr></thead><tbody>
+    ${o.ops.map((r) => `<tr><td>${r.navn}</td><td class="n">${r.n}</td>
+      <td>${r.n ? `<span class="fordeling" title="${r.foerste} % · ${r.andet} % · ${r.forkert} %"><i class="f1" style="width:${r.foerste}%"></i><i class="f2" style="width:${r.andet}%"></i><i class="f3" style="width:${r.forkert}%"></i></span>
+        <small>${r.foerste} % · ${r.andet} % · ${r.forkert} %</small>` : '<small>Ikke spillet endnu</small>'}</td>
+      <td class="n">${r.n ? r.sek : ''}</td><td><span class="maerke ${mærke[r.vurdering][1]}">${r.n ? mærke[r.vurdering][0] : ''}</span></td></tr>`).join('')}
+    </tbody></table>
+    <h2>Forslag</h2>
+    ${raad.map((t) => `<p>${t}</p>`).join('')}
+    <h2>De seneste 7 dage</h2>
+    <div class="uge">${o.dage.map((d) => `<div><span class="soejle"><i style="height:${Math.round((d.n / maksDag) * 100)}%"></i></span><b>${d.n}</b><small>${d.ugedag}</small></div>`).join('')}</div>
+    <p class="muted">Antal opgaver pr. dag. I alt ${o.dage.reduce((a, d) => a + d.n, 0)} opgaver og ${o.dage.reduce((a, d) => a + d.min, 0)} minutter på opgaver i perioden.</p>
+    <h2>Opgaver, der drillede</h2>
+    ${o.drillede.length ? `<table class="top"><tbody>${o.drillede.map((d) => `<tr><td>${OPS[d.op]}</td><td>${esc(d.opgave)}</td><td class="n">= ${esc(d.svar)}</td></tr>`).join('')}</tbody></table>`
+    : '<p class="muted">Ingen endnu. Her vises de seneste opgaver, som blev forkerte i begge forsøg.</p>'}
+    <p class="muted">Tallene tælles fra ${o.fra.split('-').reverse().join('.')} og gemmes kun på denne enhed. Tiden er den tid, der bruges på selve opgaverne, ikke på skud og butik.</p>
+    <div class="row">${btn('udskriv', 'Udskriv', 'ghost')}${btn('indstillinger', 'Tilbage', 'ghost')}</div>
+  </div>`);
+}
+
 // Grafik gemmes for enheden (ikke pr. spiller): auto, flot eller hurtig
 const GRAFIK = 'fodboldspillet.grafik';
 function grafikValg() { try { return localStorage.getItem(GRAFIK) || 'auto'; } catch { return 'auto'; } }
@@ -389,6 +431,7 @@ async function besvar(f, knap) {
     return;
   }
   ui.querySelectorAll('.answers button').forEach((b) => b.setAttribute('disabled', ''));
+  noter(me, q, rigtigt ? (kamp.forsoeg === 0 ? 'foerste' : 'andet') : 'forkert', (performance.now() - kamp.start) / 1000);
   if (rigtigt) {
     const foerste = kamp.forsoeg === 0;
     kamp.rigtige++;
@@ -420,6 +463,7 @@ async function besvar(f, knap) {
     flash.textContent = tekst;
   } else {
     kamp.svar[kamp.nr] = false;
+    db.gem(me);
     lyd.forkert();
     knap?.classList.add('wrong');
     if (kamp.valg) ui.querySelectorAll('.choice').forEach((b) => { if (same(kamp.valg[Number(b.dataset.i)], q.answer)) b.classList.add('right'); });
@@ -664,6 +708,7 @@ function duelOpgave() {
   k.valg = p.klasse <= 3 ? svarmuligheder(q) : null;
   k.indtastet = '';
   k.laast = false;
+  k.start = performance.now();
   tegnOpgave(`${esc(p.navn)}s tur · ${OPS[q.op]}`);
   if (p.oplaesning) sig(q.say);
 }
@@ -674,6 +719,7 @@ async function duelSvar(f, knap) {
   stopTale();
   const q = k.q, rigtigt = same(f, q.answer);
   ui.querySelectorAll('.answers button').forEach((b) => b.setAttribute('disabled', ''));
+  noter(d.sp[d.tur], q, rigtigt ? 'foerste' : 'forkert', (performance.now() - k.start) / 1000);
   const flash = document.getElementById('flash');
   if (rigtigt) {
     d.rigtige[d.tur]++; d.point[d.tur] += 10;
@@ -892,6 +938,8 @@ const handlinger = {
   },
   superskud: () => { const s = kamp?.sigte; if (s?.klar && kamp.superskud > 0) { s.super = !s.super; tegnSigte(); } },
   indstillinger: () => skaermIndstil(),
+  voksen: () => skaermVoksen(),
+  udskriv: () => window.print(),
   grafik: async (el) => {
     try { localStorage.setItem(GRAFIK, el.dataset.v); if (el.dataset.v !== 'auto') localStorage.removeItem(GRAFIK + '.maalt'); } catch { /* ingen lagring */ }
     const scroll = ui.firstElementChild.scrollTop;

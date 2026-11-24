@@ -258,3 +258,33 @@ table.top { width: 100%; border-collapse: collapse; }
 .dag .naeste { margin-top: 5px; padding-top: 6px; border-top: 2px solid #2a426b; font-size: 0.95rem; }
 .dag .naeste b { display: inline; color: var(--flood); }
 .callout p { margin: 0; }
+
+/* ---------- til forældre og lærere ---------- */
+.voksen h2 { font-size: 1.5rem; color: var(--flood); margin-top: 6px; }
+.stats.fire { grid-template-columns: repeat(4, 1fr); }
+.stats.fire .stat b { font-size: 1.9rem; }
+.voksentabel td { vertical-align: middle; font-weight: 600; }
+.voksentabel td:first-child { font: 800 1rem var(--body); color: var(--chalk); width: auto; }
+.fordeling { display: flex; height: 12px; min-width: 150px; background: #2a426b; }
+.fordeling i { display: block; height: 100%; }
+.fordeling .f1 { background: var(--pitch); } .fordeling .f2 { background: var(--flood); } .fordeling .f3 { background: var(--red); }
+.voksentabel small { color: #a9b8d0; }
+.maerke { font-weight: 800; font-size: 0.85rem; white-space: nowrap; color: #a9b8d0; }
+.maerke.god { color: #5fe08f; } .maerke.svag { color: #ff8a90; }
+.uge { display: grid; grid-template-columns: repeat(7, 1fr); gap: 8px; text-align: center; }
+.uge .soejle { display: flex; align-items: flex-end; height: 90px; background: var(--night-2); }
+.uge .soejle i { display: block; width: 100%; background: var(--flood); min-height: 2px; }
+.uge b { display: block; font: 800 italic 1.3rem/1.2 var(--display); }
+.uge small { color: #a9b8d0; }
+@media print {
+  * { -webkit-print-color-adjust: exact; print-color-adjust: exact; }
+  #stage { display: none; }
+  html, body { overflow: visible; height: auto; background: #fff; color: #000; }
+  #ui { position: static; display: block; }
+  .panel { width: 100% !important; height: auto; max-height: none !important; overflow: visible; background: #fff; color: #000; border: 0; box-shadow: none; }
+  .panel h1, .voksen h2, .stat b, .uge b { color: #000; }
+  .stat, .uge .soejle, .fordeling { background: #e6e6e6; }
+  .muted, .stat span, .voksentabel small, .uge small, .top th { color: #444; }
+  .top td:first-child { color: #000; }
+  .row { display: none; }
+}
