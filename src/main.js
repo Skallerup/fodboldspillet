@@ -69,6 +69,7 @@ const kit = (p) => ({ farve1: p.farve1, farve2: p.farve2, nummer: p.nummer, ...u
 function hero(p) { world.turneringer = p.turneringer | 0; world.showHero(p.figur, kit(p)); world.setUdstyr(udstyr(p), kit(p)); }
 const btn = (a, label, cls = '', extra = '') => `<button class="btn ${cls}" data-a="${a}" ${extra}><span>${label}</span></button>`;
 const klasseNavn = (k) => `${k}. klasse`;
+const wait = (ms) => new Promise((r) => setTimeout(r, ms));
 /** Spillerens valgte regnearter som liste (ældre gemte spillere har kun ét valg). */
 function arter(p) {
   if (!Array.isArray(p.regnearter) || !p.regnearter.length) {

@@ -6,6 +6,7 @@ Dansk 3D-matematikspil til børn (0.-10. klasse) med fodboldtema. Statisk hjemme
 
 - Kør lokalt: `python3 -m http.server 8000`
 - Test: `node tests/math.test.mjs`, `node tests/daily.test.mjs` og `node tests/stats.test.mjs`
+- Før hvert push: `npx eslint src/` (fanger navne, der ikke findes; `eslint.config.mjs`) og røgtesten `node tests/smoke.cjs` med en lokal server kørende (spiller to hele kampe i Chrome via Playwright). Spillet gik i stå i en udgivet version, fordi en hjælpefunktion blev slettet ved en fejl, og kun enhedstestene blev kørt.
 - Byg modeller: `python3 tools/blender/build_assets.py [--render] [--cards]` og derefter `python3 tools/blender/build_assets.py --lite` (kræver Blender 5.x eller `pip install bpy`)
 
 ## Arkitektur
