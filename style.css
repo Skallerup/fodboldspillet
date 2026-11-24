@@ -248,3 +248,13 @@ table.top { width: 100%; border-collapse: collapse; }
 .duelnavn.tur { opacity: 1; background: var(--night-2); }
 .shout small { font-size: 0.26em; }
 .card .skift { display: block; font: 800 0.8rem/1.3 var(--body); color: var(--chalk); text-align: right; text-decoration: underline; }
+
+/* ---------- kort forside ---------- */
+.tiles.tre { grid-template-columns: repeat(3, 1fr); gap: 8px; }
+.tiles.fire { grid-template-columns: repeat(4, 1fr); gap: 8px; }
+.tiles.tre .tile, .tiles.fire .tile { padding: 9px 8px; min-height: 56px; }
+.tiles.tre .tile b, .tiles.fire .tile b { font-size: 1.12rem; }
+.tiles.tre .tile small, .tiles.fire .tile small { font-size: 0.78rem; }
+.dag .naeste { margin-top: 5px; padding-top: 6px; border-top: 2px solid #2a426b; font-size: 0.95rem; }
+.dag .naeste b { display: inline; color: var(--flood); }
+.callout p { margin: 0; }

@@ -198,7 +198,8 @@ export class World {
     this.scene.background = new THREE.Color(0x8ec9f5);
     this.scene.fog = new THREE.Fog(0x8ec9f5, 120, 320);
     this.camera = new THREE.PerspectiveCamera(42, 1, 0.1, 500);
-    this.scene.add(new THREE.HemisphereLight(0xe4f2ff, 0x3f7f45, 1.5));
+    this.hemi = new THREE.HemisphereLight(0xe4f2ff, 0x3f7f45, 1.5);
+    this.scene.add(this.hemi);
     const sun = this.sun = new THREE.DirectionalLight(0xfff3dc, 2.4);
     sun.castShadow = true;
     sun.shadow.mapSize.set(2048, 2048);
@@ -272,6 +273,17 @@ export class World {
     this.scene.add(this.aim);
     this.initKonfetti();
     this.initFyr();
+    // lysshow: farvede lyspletter, der fejer hen over græsset under aftenkampe
+    this.lysPletter = new THREE.Group();
+    [0x35e0ff, 0xff4fd8, 0xffe14a, 0x7dff9a, 0xffffff].forEach((farve) => {
+      const plet = new THREE.Mesh(new THREE.CircleGeometry(3.6, 28),
+        new THREE.MeshBasicMaterial({ color: farve, transparent: true, opacity: 0.3, blending: THREE.AdditiveBlending, depthWrite: false }));
+      plet.rotation.x = -Math.PI / 2;
+      plet.position.y = 0.05;
+      this.lysPletter.add(plet);
+    });
+    this.lysPletter.visible = false;
+    this.scene.add(this.lysPletter);
     // maskot
     this.mascot = this.assets.mascot;
     this.mascot.traverse((o) => { if (o.isMesh) o.castShadow = true; });
@@ -373,7 +385,12 @@ export class World {
       if (del) del.visible = o.tilskuere >= fra && o.stadion >= 2;
     }
     this.beams = this.stadium.getObjectByName('Beams');
-    this.beams?.traverse((m) => { if (m.isMesh) { m.material.transparent = true; m.material.opacity = 0.28; m.material.depthWrite = false; m.castShadow = false; } });
+    this.beams?.traverse((m) => {
+      if (!m.isMesh) return;
+      Object.assign(m.material, { transparent: true, opacity: 0.5, depthWrite: false, blending: THREE.AdditiveBlending, side: THREE.DoubleSide });
+      m.castShadow = false;
+    });
+    this.setAften(o.tilskuere >= 9 && o.stadion >= 2);
     this.konfetti.material.size = o.tilskuere >= 7 ? 0.36 : 0.2;
     for (const navn of ['Banners', 'Tifo']) this.stadium.getObjectByName(navn)?.traverse((m) => {
       if (!m.isMesh) return;
@@ -400,6 +417,20 @@ export class World {
     });
     this.cups.forEach((c, i) => { c.visible = i < o.pokaler; });
     this.placerEkstra();
+  }
+  /** Aftenkamp: mørk himmel og dæmpet lys, så projektører og lysshow træder frem. */
+  setAften(aften) {
+    if (this.aften === aften) return;
+    this.aften = aften;
+    const himmel = aften ? 0x16224a : 0x8ec9f5;
+    this.scene.background.set(himmel);
+    this.scene.fog.color.set(himmel);
+    this.hemi.color.set(aften ? 0x8fa6e8 : 0xe4f2ff);
+    this.hemi.groundColor.set(aften ? 0x24503a : 0x3f7f45);
+    this.hemi.intensity = aften ? 0.85 : 1.5;
+    this.sun.color.set(aften ? 0xcfdcff : 0xfff3dc);
+    this.sun.intensity = aften ? 1.25 : 2.4;
+    this.lysPletter.visible = aften;
   }
   placerEkstra() {
     const o = this.udstyr, m = this.mascot;
@@ -837,7 +868,14 @@ export class World {
       this.fyr.material.opacity = Math.min(1, this.fLife / 0.8);
       if (this.fLife <= 0) this.fyr.visible = false;
     }
-    if (this.beams?.visible) this.beams.rotation.y = Math.sin(this.time * 0.6) * 0.12;
+    if (this.beams?.visible) this.beams.rotation.y = Math.sin(this.time * 0.6) * 0.22;
+    if (this.lysPletter?.visible) {
+      const midtZ = this.mode === 'penalty' ? GOAL_Z - 6 : this.player ? this.player.root.position.z + 3 : 0;
+      this.lysPletter.children.forEach((plet, i) => {
+        plet.position.x = Math.sin(this.time * (0.5 + i * 0.13) + i * 1.7) * 13;
+        plet.position.z = midtZ + Math.cos(this.time * (0.4 + i * 0.11) + i * 2.3) * 9;
+      });
+    }
     if (this.mascot?.visible) {
       this.maskotJubel = Math.max(0, (this.maskotJubel || 0) - dt);
       const fart = this.maskotJubel > 0 ? 16 : 5, hop = this.maskotJubel > 0 ? 0.5 : 0.08;

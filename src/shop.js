@@ -14,7 +14,7 @@ export const TRIN = {
     ['Tag over tribunerne', 'Nu sidder alle i tørvejr'],
     ['Storskærm', 'En kæmpe skærm tårner sig op bag målet'],
     ['Mesterbuen', 'En hvid bue hen over hele stadion'],
-  ], [0, 300, 600, 900, 1300, 1800, 2400, 3200, 4500, 6000]) },
+  ], [0, 500, 800, 1100, 1500, 2000, 2600, 3400, 4700, 6200]) },
   tilskuere: { navn: 'Tilskuere og stemning', kraever: { stadion: 2 }, trin: trin([
     ['Tomme tribuner', 'Der er ingen kommet endnu'],
     ['De første tilskuere', 'En lille flok har fundet vej'],
@@ -25,8 +25,8 @@ export const TRIN = {
     ['Kæmpebannere', 'Store bannere i holdets farver på tribunerne'],
     ['Konfettiregn', 'Meget mere konfetti, når du scorer'],
     ['Fyrværkeri', 'Himlen lyser op ved hvert mål'],
-    ['Lysshow', 'Lyskegler fejer hen over stadion'],
-  ], [0, 200, 400, 700, 1000, 1400, 1900, 2500, 3300, 4500]) },
+    ['Aftenkamp med lysshow', 'Mørket falder på, og lyskegler fejer hen over stadion'],
+  ], [0, 400, 600, 900, 1200, 1600, 2100, 2700, 3500, 5000]) },
   pokaler: { navn: 'Pokalrum', trin: trin([
     ['Tomt podie', 'Her er plads til ni pokaler'],
     ['Kobberpokalen', 'Din første pokal'],
@@ -38,30 +38,30 @@ export const TRIN = {
     ['Guldpokalen', 'Kun for de bedste'],
     ['Rosenguldpokalen', 'Sjælden og flot'],
     ['Mesterpokalen', 'Den største af dem alle'],
-  ], [0, 300, 500, 800, 1200, 1700, 2300, 3000, 4000, 6000]) },
+  ], [0, 450, 650, 900, 1300, 1800, 2400, 3100, 4100, 6000]) },
 };
 
 /** Ting man ejer flere af og vælger imellem. */
 export const VALG = {
   troeje: { navn: 'Trøje', ting: {
     striber: { navn: 'Striber', pris: 0 },
-    ensfarvet: { navn: 'Ensfarvet', pris: 300 },
-    ringe: { navn: 'Tværstriber', pris: 450 },
+    ensfarvet: { navn: 'Ensfarvet', pris: 450 },
+    ringe: { navn: 'Tværstriber', pris: 600 },
     skraa: { navn: 'Skråbånd', pris: 750 },
     tern: { navn: 'Tern', pris: 750 },
     guld: { navn: 'Guldtrøjen', pris: 1800 },
   } },
   bold: { navn: 'Bold', ting: {
     klassisk: { navn: 'Klassisk', pris: 0 },
-    neon: { navn: 'Neonbold', pris: 300 },
+    neon: { navn: 'Neonbold', pris: 450 },
     guld: { navn: 'Guldbold', pris: 900 },
     ild: { navn: 'Ildbold', pris: 1500 },
   } },
   stoevler: { navn: 'Støvler', ting: {
     sort: { navn: 'Sorte', pris: 0 },
-    hvid: { navn: 'Hvide', pris: 250 },
-    roed: { navn: 'Røde lyn', pris: 250 },
-    neon: { navn: 'Neon', pris: 450 },
+    hvid: { navn: 'Hvide', pris: 400 },
+    roed: { navn: 'Røde lyn', pris: 400 },
+    neon: { navn: 'Neon', pris: 600 },
     guld: { navn: 'Guldstøvler', pris: 1200 },
   } },
   jubel: { navn: 'Målfejring', ting: {

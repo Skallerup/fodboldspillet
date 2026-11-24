@@ -10,7 +10,7 @@ import { hentKort, alleKort, samling, antalKort, traekKort, SJAELDENHED } from '
 const ui = document.getElementById('ui');
 const stage = document.getElementById('stage');
 const world = new World(stage);
-const MAAL_POINT = 25, PERFEKT_BONUS = 30;
+const MAAL_POINT = 25, CHANCE_POINT = 15, PERFEKT_BONUS = 30;
 const FARVER = ['#D81E2C', '#1E5BD8', '#F5C400', '#159A48', '#F07818', '#7A2FD0', '#35B6F0', '#15171C', '#F4F4F0'];
 const HOLDNAVNE = ['FC Lynet', 'Tordenstøvlerne', 'Regnehajerne', 'Gangeløverne', 'Brøkbanden', 'Plus United', 'Minus Mestrene',
   'FC Hattrick', 'Talmagikerne', 'Stolpe Ind FC', 'Dribleholdet', 'Sparkemaskinerne'];
@@ -175,22 +175,29 @@ function skaermHub() {
   hero(me);
   const valgt = arter(me);
   const arterTekst = valgt.length === Object.keys(OPS).length ? 'Alle regnearter' : valgt.map((v) => OPS[v]).join(', ');
+  const d = dagens(me), maal = naesteMaal(me);
+  const felt = (a, navn, under) => `<button class="tile" data-a="${a}"><b>${navn}</b><small>${under}</small></button>`;
   show('s-hub', `<div class="panel">
     <button class="card" data-a="spillere" style="--c1:${me.farve1};--c2:${me.farve2}" aria-label="Skift spiller. Nu: ${esc(me.navn)}">
       <span class="badge">${esc(me.nummer)}</span>
       <span><b>${esc(me.navn)}</b><small>${esc(me.hold)} · ${raekke(me).navn}</small></span>
       <span class="pts">${me.pointIAlt} p<small class="skift">Skift spiller</small></span></button>
-    ${btn('spil', 'Spil kamp', 'big wide')}
-    <div class="row">${btn('hurtig', 'Hurtig kamp · 5 opgaver', 'ghost')}${btn('toSpillere', 'To spillere', 'ghost')}</div>
+    ${btn('spil', me.kampe || me.guidet ? 'Spil kamp' : 'Spil din første kamp', 'big wide')}
     <button class="summary" data-a="indstillinger"><span><b>${klasseNavn(me.klasse)} · ${NIVEAU_NAVN[me.niveau]}</b><small>${arterTekst}</small></span><span class="inuse">Skift</span></button>
-    ${btn('turnering', me.turnering ? `Turnering: ${RUNDER[me.turnering.runde].navn.toLowerCase()}` : 'Pokalturnering', 'ghost wide')}
-    ${dagHtml()}
-    ${maalHtml()}
-    <div class="tiles">
-      <button class="tile" data-a="butik"><b>Butik</b><small>${me.point} p</small></button>
-      <button class="tile" data-a="album"><b>Album</b><small>${antalKort(me)}/${alleKort().length}${samling(me) && me.pakker ? ` · ${me.pakker} pakke` : ''}</small></button>
-      <button class="tile" data-a="top"><b>Topscore</b><small>${me.kampe} kampe</small></button>
-      <button class="tile" data-a="indstillinger"><b>Indstillinger</b><small>Lyd, grafik, spiller</small></button>
+    <div class="tiles tre">
+      ${felt('hurtig', 'Hurtig kamp', '5 opgaver')}
+      ${felt('toSpillere', 'To spillere', 'Samme enhed')}
+      ${felt('turnering', 'Turnering', me.turnering ? RUNDER[me.turnering.runde].navn : 'Tre kampe')}
+    </div>
+    <div class="dag ${d.faerdig ? 'done' : ''}"><b>Dagens udfordring</b><span>${d.u.tekst}</span>
+      <span class="progress"><i style="width:${Math.round((d.har / d.u.n) * 100)}%"></i></span>
+      <small>${d.faerdig ? 'Klaret! Kom igen i morgen.' : `${d.har} af ${d.u.n} · Præmie: ${DAG_POINT} point og en kortpakke`}</small>
+      ${maal.length ? `<span class="naeste"><b>Næste mål:</b> ${maal[0]}</span>` : ''}</div>
+    <div class="tiles fire">
+      ${felt('butik', 'Butik', `${me.point} p`)}
+      ${felt('album', 'Album', `${antalKort(me)}/${alleKort().length}${samling(me) && me.pakker ? ` · ${me.pakker} ny` : ''}`)}
+      ${felt('top', 'Topscore', `${me.kampe} kampe`)}
+      ${felt('indstillinger', 'Mere', 'Indstillinger')}
     </div>
   </div>`);
 }
@@ -278,14 +285,34 @@ function skaermTop() {
 const juster = (p) => (p.tilpas === false ? 0 : Math.max(-2, Math.min(2, p.justering | 0)));
 function kommentar(tekst) { if (me && me.kommentator !== false && me.lyd) sig(tekst); }
 
-function startKamp({ turnering = false, antal = 10 } = {}) {
+/** En besked midt på skærmen, som spilleren trykker væk. */
+function besked(titel, tekst, knap = 'Forstået') {
+  return new Promise((resolve) => {
+    kamp.beskedSvar = resolve;
+    show('s-finale', `${hud()}<div class="callout"><h2>${titel}</h2>${tekst}${btn('beskedOk', knap, 'big')}</div><span></span>`);
+  });
+}
+/** Den allerførste kamp: tre opgaver og en finale, med korte forklaringer undervejs. */
+async function foersteKamp() {
+  me.guidet = true;
+  db.gem(me);
+  startKamp({ antal: 3, guide: true });
+}
+function startKamp({ turnering = false, antal = 10, guide = false } = {}) {
   const t = turnering && me.turnering ? { ...RUNDER[me.turnering.runde], figur: me.turnering.hold[me.turnering.runde] } : null;
   kamp = { antal: t ? 10 : antal, nr: 0, rigtige: 0, stribe: 0, fejlStribe: 0, point: 0, svar: [], maal: 0, skud: [], laast: false, q: null,
-    indtastet: '', forsoeg: 0, fase: 'opgaver', superskud: 0, chancer: 0, turnering: t, dagKlaret: false, sigte: null, raekkeFoer: raekke(me).nr };
+    indtastet: '', forsoeg: 0, fase: 'opgaver', superskud: 0, chancer: 0, turnering: t, dagKlaret: false, sigte: null, raekkeFoer: raekke(me).nr, guide };
   world.startMatch(me.figur, kit(me), t ? { rival: t.figur, rivalKit: HOLD[t.figur] } : {});
   world.setUdstyr(udstyr(me), kit(me));
   lyd.floejte();
   publikum(0.3);
+  if (guide) {
+    const k = kamp;
+    kamp.fase = 'besked';
+    besked('Din første kamp', `<p>Svar rigtigt på opgaven, så dribler du forbi modstanderen.</p>
+      <p>Svarer du forkert, får du et hint og ét forsøg mere.</p>`, 'Kom i gang').then(() => { if (kamp === k) naesteOpgave(); });
+    return;
+  }
   if (!me.oplaesning) kommentar(`Velkommen til kampen. ${me.navn} har bolden.`);
   naesteOpgave();
 }
@@ -466,13 +493,13 @@ async function affyr(x, y) {
   s.resolve(await world.skyd(pt, () => lyd.spark(), brugSuper, s.zone));
 }
 /** Vis resultatet af et skud, og giv point og lyd. navn bruges af kommentatoren. */
-async function visSkud(res, k, navn = me.navn, giv = givPoint) {
+async function visSkud(res, k, navn = me.navn, giv = givPoint, point = MAAL_POINT) {
   const maal = res === 'maal';
   if (maal) {
-    giv(MAAL_POINT); lyd.jubel(); publikum(1);
+    giv(point); lyd.jubel(); publikum(1);
     kommentar(`Mål! ${navn} scorer!`);
   } else if (res === 'stolpe') { lyd.stolpe(); kommentar('Stolpen!'); } else { lyd.aah(); if (res === 'reddet') kommentar('Målmanden redder!'); }
-  const tekst = { maal: `Mååål!<small>+${MAAL_POINT} point</small>`, reddet: 'Reddet!', stolpe: 'Stolpen!', forbi: 'Forbi!', forsent: 'For sent!' }[res];
+  const tekst = { maal: `Mååål!<small>+${point} point</small>`, reddet: 'Reddet!', stolpe: 'Stolpen!', forbi: 'Forbi!', forsent: 'For sent!' }[res];
   show('s-finale', `${skudHud()}<div class="shout ${maal ? '' : 'no'}">${tekst}</div><span></span>`);
   await wait(maal ? 1900 : 1500);
   if (kamp === k) publikum(0.3);
@@ -492,7 +519,7 @@ async function chance(k) {
   if (kamp !== k) return;
   if (res === 'forsent') world.goalie.play('cheer');
   if (res === 'maal') { k.maal++; if (taelDag(me, 'maal')) k.dagKlaret = true; }
-  await visSkud(res, k);
+  await visSkud(res, k, me.navn, givPoint, CHANCE_POINT);
   if (kamp !== k) return;
   world.slutChance();
 }
@@ -516,6 +543,7 @@ function startFinale() {
     Det giver ${antal} skud på mål. Hvert mål giver ${MAAL_POINT} point.</p>
     ${t ? `<p><b>${t.navn}: du har ${kamp.maal} mål og skal have mindst ${t.krav} for at vinde over ${HOLD[t.figur].navn}.</b></p>` : ''}
     ${kamp.superskud ? `<p class="unlock">Du har ${kamp.superskud} superskud: en ildkugle, som målmanden ikke kan redde.</p>` : ''}
+    ${kamp.guide ? '<p class="unlock">Tryk i målet, dér hvor bolden skal hen. Sigt væk fra målmanden!</p>' : ''}
     ${btn('klar', 'Jeg er klar', 'big')}</div><span></span>`);
 }
 async function finaleLoop() {
@@ -585,7 +613,10 @@ function skaermResultat() {
       <div class="stat"><b>+${k.point}</b><span>point</span></div>
     </div>
     <p>Du har nu <b>${me.pointIAlt} point</b> og ligger nummer ${plads} på topscoren.</p>
-    ${maalHtml()}
+    ${k.guide ? `<div class="dag"><b>Sådan fortsætter du</b>
+      <span>En rigtig kamp har 10 opgaver. Hvert tredje rigtige svar giver et skud på mål med det samme.</span>
+      <span>Fem rigtige i træk giver et superskud, som målmanden ikke kan redde.</span>
+      <span>Brug dine point i butikken på et større stadion, nyt tøj og pokaler.</span></div>` : maalHtml()}
     <p class="${gemt ? 'saved' : 'error'}">${gemt ? 'Dine point er gemt.' : 'Pointene kunne ikke gemmes på denne enhed.'}</p>
     ${nye.map((f) => `<p class="unlock">Ny figur låst op: ${FIGURER[f]}! Vælg den under „Ret spiller“.</p>`).join('')}
     <div class="row">${btn('pakke', me.pakker > 1 ? `Åbn dine kortpakker (${me.pakker})` : 'Åbn din kortpakke', 'big')}</div>
@@ -887,7 +918,8 @@ const handlinger = {
   indstil: (el) => { me[el.dataset.k] = el.dataset.v; me.justering = 0; db.gem(me); skaermIndstil(ui.firstElementChild.scrollTop); },
   klasse: (el) => { me.klasse = Math.max(0, Math.min(10, me.klasse + Number(el.dataset.v))); me.justering = 0; db.gem(me); skaermIndstil(ui.firstElementChild.scrollTop); },
   skift: (el) => { const felt = el.dataset.k; me[felt] = ['tilpas', 'kommentator'].includes(felt) ? me[felt] === false : !me[felt]; db.gem(me); setLyd(me.lyd); skaermIndstil(ui.firstElementChild.scrollTop); },
-  spil: () => startKamp(),
+  spil: () => (me.kampe || me.guidet ? startKamp() : foersteKamp()),
+  beskedOk: () => { const r = kamp?.beskedSvar; if (r) { kamp.beskedSvar = null; r(); } },
   hurtig: () => startKamp({ antal: 5 }),
   toSpillere: () => skaermDuelValg(),
   duel: (el) => startDuel(el.dataset.id),

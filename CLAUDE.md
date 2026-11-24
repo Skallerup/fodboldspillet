@@ -52,6 +52,9 @@ Dansk 3D-matematikspil til børn (0.-10. klasse) med fodboldtema. Statisk hjemme
 - Hurtig kamp har 5 opgaver (`kamp.antal`). Turneringens `krav` tæller alle mål i kampen.
 - To spillere (`startDuel`, `duelLoop`): fem opgaver hver med egne indstillinger, derefter straffespark, hvor den anden vælger målmandens side (`zone` i `World.skyd`).
 - Rækker (`RAEKKER`) følger `pointIAlt`; `naesteMaal` viser de nærmeste ting at spille for.
+- Første kamp er guidet (`foersteKamp`, `kamp.guide`): tre opgaver og en finale med korte forklaringer (`besked`). `me.guidet` sikrer, at den kun vises én gang.
+- Point: mål i finalen giver `MAAL_POINT` (25), mål fra chancer `CHANCE_POINT` (15).
+- Tilskuere level 10 er en aftenkamp (`World.setAften`): mørk himmel, dæmpet lys og farvede lyspletter på græsset (`lysPletter`).
 - `World.fart` spoler animationerne frem og bruges kun i test.
 
 ## Grafik og indstillinger
