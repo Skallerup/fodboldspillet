@@ -4,22 +4,22 @@
 export const TRIN = {
   stadion: { navn: 'Stadion', trin: [
     { navn: 'Træningsbanen' },
-    { navn: 'Projektører', pris: 200, tekst: 'Fire høje lysmaster rundt om banen' },
-    { navn: 'Store tribuner', pris: 500, tekst: 'Plads til tusindvis af tilskuere' },
-    { navn: 'Tag over tribunerne', pris: 1000, tekst: 'Nu er det et rigtigt stadion' },
+    { navn: 'Projektører', pris: 600, tekst: 'Fire høje lysmaster rundt om banen' },
+    { navn: 'Store tribuner', pris: 1500, tekst: 'Plads til tusindvis af tilskuere' },
+    { navn: 'Tag over tribunerne', pris: 3000, tekst: 'Nu er det et rigtigt stadion' },
   ] },
   tilskuere: { navn: 'Tilskuere og maskot', trin: [
     { navn: 'Stille tribuner' },
-    { navn: 'Maskotten Ørni', pris: 250, tekst: 'En stor gul fugl, der hepper på dig' },
-    { navn: 'Flag i dine farver', pris: 400, tekst: 'Fansene hejser dit holds flag' },
-    { navn: 'Fyrværkeri ved mål', pris: 700, tekst: 'Himlen lyser op, når du scorer' },
+    { navn: 'Maskotten Ørni', pris: 750, tekst: 'En stor gul fugl, der hepper på dig' },
+    { navn: 'Flag i dine farver', pris: 1200, tekst: 'Fansene hejser dit holds flag' },
+    { navn: 'Fyrværkeri ved mål', pris: 2000, tekst: 'Himlen lyser op, når du scorer' },
   ] },
   pokaler: { navn: 'Pokalskab', trin: [
     { navn: 'Tomt bord' },
-    { navn: 'Bronzepokalen', pris: 300, tekst: 'Din første pokal' },
-    { navn: 'Sølvpokalen', pris: 600, tekst: 'Blank som en ny bold' },
-    { navn: 'Guldpokalen', pris: 1200, tekst: 'Kun for de bedste' },
-    { navn: 'Mesterpokalen', pris: 2500, tekst: 'Den største af dem alle' },
+    { navn: 'Bronzepokalen', pris: 900, tekst: 'Din første pokal' },
+    { navn: 'Sølvpokalen', pris: 1800, tekst: 'Blank som en ny bold' },
+    { navn: 'Guldpokalen', pris: 3500, tekst: 'Kun for de bedste' },
+    { navn: 'Mesterpokalen', pris: 7500, tekst: 'Den største af dem alle' },
   ] },
 };
 
@@ -27,30 +27,30 @@ export const TRIN = {
 export const VALG = {
   troeje: { navn: 'Trøje', ting: {
     striber: { navn: 'Striber', pris: 0 },
-    ensfarvet: { navn: 'Ensfarvet', pris: 100 },
-    ringe: { navn: 'Tværstriber', pris: 150 },
-    skraa: { navn: 'Skråbånd', pris: 250 },
-    tern: { navn: 'Tern', pris: 250 },
-    guld: { navn: 'Guldtrøjen', pris: 600 },
+    ensfarvet: { navn: 'Ensfarvet', pris: 300 },
+    ringe: { navn: 'Tværstriber', pris: 450 },
+    skraa: { navn: 'Skråbånd', pris: 750 },
+    tern: { navn: 'Tern', pris: 750 },
+    guld: { navn: 'Guldtrøjen', pris: 1800 },
   } },
   bold: { navn: 'Bold', ting: {
     klassisk: { navn: 'Klassisk', pris: 0 },
-    neon: { navn: 'Neonbold', pris: 100 },
-    guld: { navn: 'Guldbold', pris: 300 },
-    ild: { navn: 'Ildbold', pris: 500 },
+    neon: { navn: 'Neonbold', pris: 300 },
+    guld: { navn: 'Guldbold', pris: 900 },
+    ild: { navn: 'Ildbold', pris: 1500 },
   } },
   stoevler: { navn: 'Støvler', ting: {
     sort: { navn: 'Sorte', pris: 0 },
-    hvid: { navn: 'Hvide', pris: 80 },
-    roed: { navn: 'Røde lyn', pris: 80 },
-    neon: { navn: 'Neon', pris: 150 },
-    guld: { navn: 'Guldstøvler', pris: 400 },
+    hvid: { navn: 'Hvide', pris: 250 },
+    roed: { navn: 'Røde lyn', pris: 250 },
+    neon: { navn: 'Neon', pris: 450 },
+    guld: { navn: 'Guldstøvler', pris: 1200 },
   } },
   jubel: { navn: 'Målfejring', ting: {
     hop: { navn: 'Hop', pris: 0 },
-    dans: { navn: 'Sejrsdans', pris: 150 },
-    flyver: { navn: 'Flyveren', pris: 300 },
-    salto: { navn: 'Baglæns salto', pris: 500 },
+    dans: { navn: 'Sejrsdans', pris: 450 },
+    flyver: { navn: 'Flyveren', pris: 900 },
+    salto: { navn: 'Baglæns salto', pris: 1500 },
   } },
 };
 
@@ -93,4 +93,17 @@ export function brugTing(p, k, id) {
   if (!o.ejet[k].includes(id)) return false;
   o.valgt[k] = id;
   return true;
+}
+
+// ---- hemmelige figurer, der låses op ved at nå et mål
+import { antalKort } from './cards.js';
+export const LAASE = {
+  shark: { tekst: 'Scor 15 mål i finaler', status: (p) => [p.maal | 0, 15] },
+  dragon: { tekst: 'Svar rigtigt på 150 opgaver', status: (p) => [p.rigtige | 0, 150] },
+  robot: { tekst: 'Saml 10 forskellige kort', status: (p) => [antalKort(p), 10] },
+};
+export function erLaastOp(p, figur) {
+  if (!LAASE[figur]) return true;
+  const [har, skal] = LAASE[figur].status(p);
+  return har >= skal;
 }

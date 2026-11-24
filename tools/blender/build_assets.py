@@ -3,7 +3,7 @@
 Koer:
     blender --background --python tools/blender/build_assets.py -- [--render]
 eller med bpy-modulet:
-    python tools/blender/build_assets.py [--render]
+    python tools/blender/build_assets.py [--render] [--cards]
 
 Output (assets/models/):
     char_rhino.glb, char_lion.glb, char_croc.glb, char_panda.glb
@@ -37,6 +37,10 @@ ANIMALS = {
     "lion": dict(skin=(0.80, 0.50, 0.16), style="fur", limb=None),
     "croc": dict(skin=(0.16, 0.42, 0.12), style="scales", limb=None),
     "panda": dict(skin=(0.90, 0.90, 0.88), style="fur", limb=(0.03, 0.03, 0.035)),
+    # hemmelige figurer, der laases op i spillet
+    "shark": dict(skin=(0.28, 0.44, 0.60), style="fur", limb=None),
+    "dragon": dict(skin=(0.62, 0.07, 0.06), style="scales", limb=None),
+    "robot": dict(skin=(0.60, 0.64, 0.70), style="fur", limb=None),
 }
 PIVOTS = {
     "Body": (0, 0, 0.90),
@@ -362,7 +366,113 @@ def head_panda(M):
     return [head] + hard, tail
 
 
-HEADS = {"rhino": head_rhino, "lion": head_lion, "croc": head_croc, "panda": head_panda}
+def glow(name, color, strength=2.5):
+    m = mat(name, color, 0.3)
+    bsdf = m.node_tree.nodes["Principled BSDF"]
+    for key, val in (("Emission Color", (*color, 1.0)), ("Emission Strength", strength)):
+        if key in bsdf.inputs:
+            bsdf.inputs[key].default_value = val
+    return m
+
+
+def head_shark(M):
+    g, hard = [], []
+    limb("Neck", (0, 0, 1.58), (0, -0.04, 1.82), 0.25, 0.25, M["skin"], g)
+    blob("Head", (0, -0.05, 1.95), (0.36, 0.38, 0.33), M["skin"], g)
+    blob("Snout", (0, -0.46, 1.98), (0.26, 0.42, 0.20), M["skin"], g, rot=(math.radians(-6), 0, 0))
+    limb("Nose", (0, -0.62, 2.00), (0, -1.02, 2.07), 0.19, 0.03, M["skin"], g)
+    blob("Jaw", (0, -0.30, 1.80), (0.26, 0.30, 0.14), M["skin"], g)
+    blob("Fin", (0, 0.14, 2.44), (0.05, 0.20, 0.36), M["skin"], g, rot=(math.radians(-24), 0, 0))
+    brows(g, M, 0.20, -0.36, 2.17, tilt=22)
+    bpy.ops.mesh.primitive_uv_sphere_add(segments=24, ring_count=12, location=(0, -0.50, 1.865),
+                                         rotation=(math.radians(8), 0, 0))
+    mouth = bpy.context.object
+    mouth.scale = (0.31, 0.42, 0.018)
+    head = fuse("HeadSkin", g, M["skin"], None, voxel=0.016, smooth=5, keep=0.2, cutters=[mouth])
+    for s in (-1, 1):
+        eye(hard, head, 0.20 * s, 2.07, M, size=0.75, iris=M["black"])
+        for y in (-0.84, -0.76, -0.66, -0.55, -0.44):
+            x = 0.25 * math.sqrt(max(0.0, 1 - ((y + 0.46) / 0.42) ** 2)) * s
+            z = 1.885 + (y + 0.46) * -0.12
+            limb("Tooth", (x, y, z), (x, y, z - 0.075), 0.026, 0.003, M["white"], hard, caps=False)
+        for i in range(3):
+            blob("Gill", (0.352 * s, 0.02 + 0.07 * i, 1.90), (0.012, 0.014, 0.09), M["dark"], hard)
+    gt = []
+    limb("Tail", (0, 0.32, 0.92), (0, 0.80, 0.82), 0.15, 0.06, M["skin"], gt)
+    blob("TailUp", (0, 0.92, 1.04), (0.04, 0.13, 0.30), M["skin"], gt, rot=(math.radians(28), 0, 0))
+    blob("TailDown", (0, 0.90, 0.66), (0.04, 0.11, 0.19), M["skin"], gt, rot=(math.radians(-28), 0, 0))
+    return [head] + hard, [fuse("TailSkin", gt, M["skin"], None, **FUSE)]
+
+
+def head_dragon(M):
+    g, hard = [], []
+    spike = mat("DragonSpike", (0.30, 0.02, 0.02), 0.7)
+    yellow = mat("IrisYellow", (0.95, 0.80, 0.05), 0.2)
+    limb("Neck", (0, 0, 1.58), (0, -0.04, 1.82), 0.24, 0.24, M["skin"], g)
+    blob("Head", (0, -0.05, 1.96), (0.34, 0.36, 0.31), M["skin"], g)
+    blob("Snout", (0, -0.50, 1.91), (0.24, 0.40, 0.18), M["skin"], g)
+    blob("Jaw", (0, -0.42, 1.79), (0.21, 0.34, 0.10), M["skin"], g)
+    for s in (-1, 1):
+        blob("NoseBump", (0.11 * s, -0.82, 2.02), (0.085, 0.085, 0.06), M["skin"], g)
+        blob("EyeRidge", (0.19 * s, -0.20, 2.17), (0.12, 0.14, 0.08), M["skin"], g)
+    brows(g, M, 0.19, -0.30, 2.25, tilt=22)
+    bpy.ops.mesh.primitive_uv_sphere_add(segments=24, ring_count=12, location=(0, -0.55, 1.842),
+                                         rotation=(math.radians(5), 0, 0))
+    mouth = bpy.context.object
+    mouth.scale = (0.30, 0.45, 0.016)
+    head = fuse("HeadSkin", g, M["skin"], None, voxel=0.016, smooth=5, keep=0.2, cutters=[mouth])
+    for s in (-1, 1):
+        eye(hard, head, 0.19 * s, 2.15, M, size=0.85, iris=yellow, pupil=(0.012, 0.016, 0.046))
+        blob("Nostril", (0.11 * s, -0.897, 2.03), (0.025, 0.02, 0.02), M["black"], hard)
+        pts = [(0.20 * s, 0.0, 2.20), (0.30 * s, 0.22, 2.50), (0.33 * s, 0.48, 2.63)]
+        limb("Horn", pts[0], pts[1], 0.09, 0.055, M["horn"], hard)
+        limb("HornTip", pts[1], pts[2], 0.055, 0.008, M["horn"], hard, caps=False)
+        blob("Frill", (0.345 * s, 0.06, 1.98), (0.03, 0.15, 0.17), spike, hard, rot=(0, 0, math.radians(-25 * s)))
+        limb("Fang", (0.13 * s, -0.87, 1.85), (0.13 * s, -0.88, 1.75), 0.03, 0.004, M["white"], hard, caps=False)
+        for y in (-0.72, -0.58):
+            x = 0.24 * math.sqrt(max(0.0, 1 - ((y + 0.50) / 0.40) ** 2)) * s
+            limb("Tooth", (x, y, 1.85), (x, y, 1.79), 0.02, 0.004, M["white"], hard, caps=False)
+    for p1, p2 in (((0, 0.02, 2.24), (0, 0.06, 2.42)), ((0, 0.20, 2.14), (0, 0.30, 2.30)), ((0, 0.28, 1.95), (0, 0.42, 2.05))):
+        limb("Spike", p1, p2, 0.065, 0.006, spike, hard, caps=False)
+    gt = []
+    limb("Tail", (0, 0.30, 0.92), (0, 0.75, 0.66), 0.15, 0.09, M["skin"], gt)
+    limb("Tail2", (0, 0.75, 0.66), (0, 1.15, 0.76), 0.09, 0.035, M["skin"], gt)
+    tail = [fuse("TailSkin", gt, M["skin"], None, **FUSE)]
+    limb("TailTip", (0, 1.10, 0.75), (0, 1.42, 0.86), 0.14, 0.01, spike, tail, caps=False)
+    for s in (-1, 1):
+        blob("Wing", (0.46 * s, 0.52, 1.58), (0.36, 0.03, 0.26), spike, tail, rot=(0, math.radians(18 * s), math.radians(-28 * s)))
+        limb("WingBone", (0.14 * s, 0.44, 1.42), (0.80 * s, 0.70, 1.82), 0.04, 0.015, M["skin"], tail, caps=False)
+    return [head] + hard, tail
+
+
+def head_robot(M):
+    g, hard = [], []
+    dark = mat("RobotDark", (0.07, 0.08, 0.10), 0.4)
+    cyan = glow("RobotGlow", (0.15, 0.85, 1.0))
+    red = glow("RobotRed", (1.0, 0.10, 0.08), 2.0)
+    box("Head", (0, -0.05, 2.02), (0.78, 0.70, 0.60), M["skin"], g)
+    box("Jaw", (0, -0.07, 1.74), (0.58, 0.56, 0.16), M["skin"], g)
+    head = fuse("HeadSkin", g, M["skin"], None, voxel=0.016, smooth=6, keep=0.2)
+    limb("Neck", (0, 0, 1.56), (0, -0.03, 1.72), 0.13, 0.13, dark, hard, caps=False)
+    y = front_y(head, 0.0, 2.07)
+    box("Visor", (0, y + 0.012, 2.07), (0.62, 0.06, 0.24), dark, hard)
+    for s in (-1, 1):
+        blob("EyeGlow", (0.15 * s, y - 0.012, 2.07), (0.078, 0.025, 0.078), cyan, hard)
+        limb("EarBolt", (0.37 * s, -0.05, 2.02), (0.47 * s, -0.05, 2.02), 0.11, 0.09, dark, hard, caps=False)
+        blob("EarLamp", (0.475 * s, -0.05, 2.02), (0.02, 0.05, 0.05), red, hard)
+    yb = front_y(head, 0.0, 1.86)
+    for x in (-0.15, -0.075, 0.0, 0.075, 0.15):
+        box("Grille", (x, yb + 0.005, 1.86), (0.035, 0.03, 0.11), dark, hard)
+    limb("Antenna", (0, 0, 2.28), (0, 0, 2.62), 0.022, 0.018, dark, hard, caps=False)
+    blob("AntennaBall", (0, 0, 2.66), (0.065, 0.065, 0.065), red, hard)
+    tail = []
+    box("Backpack", (0, 0.47, 1.28), (0.42, 0.16, 0.50), dark, tail)
+    blob("PackLamp", (0, 0.555, 1.38), (0.06, 0.02, 0.06), cyan, tail)
+    return [head] + hard, tail
+
+
+HEADS = {"rhino": head_rhino, "lion": head_lion, "croc": head_croc, "panda": head_panda,
+         "shark": head_shark, "dragon": head_dragon, "robot": head_robot}
 
 
 # ---------------------------------------------------------------- figur
@@ -778,28 +888,119 @@ def render(path, cam_loc, target, lens=50, res=(1400, 800), samples=32):
     bpy.ops.render.render(write_still=True)
 
 
+def _lin(hexcol):
+    h = hexcol.lstrip("#")
+    return tuple((int(h[i:i + 2], 16) / 255) ** 2.2 for i in (0, 2, 4))
+
+
+def render_cards(chars, mascot, trophy):
+    """Renderer et billede til hvert samlekort i assets/cards/cards.json."""
+    import json
+    folder = os.path.join(rp.ROOT, "assets", "cards")
+    cards = json.load(open(os.path.join(folder, "cards.json"), encoding="utf-8"))
+    scene = bpy.context.scene
+    bpy.ops.object.light_add(type="SUN", rotation=(math.radians(55), 0, math.radians(30)))
+    bpy.context.object.data.energy = 3.0
+    world = bpy.data.worlds.new("CardWorld")
+    world.use_nodes = True
+    world.node_tree.nodes["Background"].inputs[0].default_value = (0.85, 0.90, 1.0, 1)
+    world.node_tree.nodes["Background"].inputs[1].default_value = 1.1
+    scene.world = world
+    scene.render.engine = "CYCLES"
+    scene.cycles.device = "CPU"
+    scene.cycles.samples = 40
+    scene.render.film_transparent = True
+    scene.view_settings.view_transform = "Standard"
+    scene.render.resolution_x, scene.render.resolution_y = 360, 450
+    scene.render.image_settings.file_format = "WEBP"
+    scene.render.image_settings.color_mode = "RGBA"
+    scene.render.image_settings.quality = 85
+    bpy.ops.object.camera_add()
+    cam = bpy.context.object
+    cam.data.lens = 50
+    scene.camera = cam
+    # troejen farves her med en multiply-node (i spillet goer three.js det samme)
+    jersey = bpy.data.materials["Jersey"]
+    nt = jersey.node_tree
+    bsdf = nt.nodes["Principled BSDF"]
+    tex = bsdf.inputs["Base Color"].links[0].from_node
+    stripes = tex.image
+    gold = bpy.data.images.load(os.path.join(rp.ROOT, "assets", "kits", "guld.jpg"))
+    mix = nt.nodes.new("ShaderNodeMix")
+    mix.data_type = "RGBA"
+    mix.blend_type = "MULTIPLY"
+    mix.inputs[0].default_value = 1.0
+    nt.links.new(tex.outputs["Color"], mix.inputs[6])
+    nt.links.new(mix.outputs[2], bsdf.inputs["Base Color"])
+
+    def colour(name, rgb):
+        bpy.data.materials[name].node_tree.nodes["Principled BSDF"].inputs["Base Color"].default_value = (*rgb, 1.0)
+
+    spots = {}
+    for i, (kind, root) in enumerate(chars.items()):
+        root.location = (300 + 14 * i, 0, rp.STUD)
+        spots[kind] = root
+    mascot.location = (300 + 14 * 8, 0, 0)
+    spots["mascot"] = mascot
+    trophy.location = (300 + 14 * 9, 0, 0)
+    for c in trophy.children:
+        if c.name.startswith("Stand"):
+            c.hide_render = True
+        else:
+            c.scale = (2.6, 2.6, 2.6)
+    spots["trophy"] = trophy
+    poses = {"klar": (0.12, -0.12), "vink": (2.5, -0.15), "jubel": (2.5, -2.5), "maalmand": (1.2, -1.2)}
+    for card in cards:
+        root = spots[card["figur"]]
+        guld = card["sjaeldenhed"] == "guld"
+        c1, c2 = _lin(card["farve1"]), _lin(card["farve2"])
+        tex.image = gold if guld else stripes
+        mix.inputs[7].default_value = (1, 1, 1, 1) if guld else (*c1, 1.0)
+        colour("Socks", c1)
+        colour("Shorts", c2)
+        colour("Trim", c2)
+        left, right = poses[card["pose"]]
+        for ch in root.children:
+            if ch.name.startswith("ArmL"):
+                ch.rotation_euler = (0, -left, 0)
+            elif ch.name.startswith("ArmR"):
+                ch.rotation_euler = (0, -right, 0)
+        cx = root.location.x
+        if card["figur"] == "trophy":
+            loc, target = (cx + 0.9, -5.6, 2.0), (cx, 0, 1.2)
+        else:
+            loc, target = (cx + 0.8, -3.9, 2.0), (cx, 0, 1.75)
+        cam.location = loc
+        cam.rotation_euler = (Vector(target) - Vector(loc)).to_track_quat("-Z", "Y").to_euler()
+        scene.render.filepath = os.path.join(folder, card["id"] + ".webp")
+        bpy.ops.render.render(write_still=True)
+
+
 def main():
     args = sys.argv[sys.argv.index("--") + 1:] if "--" in sys.argv else sys.argv[1:]
     os.makedirs(MODELS, exist_ok=True)
     os.makedirs(PREVIEWS, exist_ok=True)
     bpy.ops.wm.read_factory_settings(use_empty=True)
     tex = make_textures()
-    chars = []
+    chars = {}
     for kind in ANIMALS:
         root = build_character(kind, tex)
         print("TRIANGLES", kind, rp.triangles(root))
         export(root, os.path.join(MODELS, f"char_{kind}.glb"))
-        chars.append(root)
+        chars[kind] = root
     ball = rp.build_ball(loc=(0, 0, 0))
     export(ball, os.path.join(MODELS, "ball.glb"))
     kit_textures()
-    export(build_trophy(), os.path.join(MODELS, "trophy.glb"))
-    export(build_mascot(), os.path.join(MODELS, "mascot.glb"))
+    trophy, mascot = build_trophy(), build_mascot()
+    export(trophy, os.path.join(MODELS, "trophy.glb"))
+    export(mascot, os.path.join(MODELS, "mascot.glb"))
     stadium = build_stadium()
     print("TRIANGLES stadium", rp.triangles(stadium))
     export(stadium, os.path.join(MODELS, "stadium.glb"))
+    if "--cards" in args:
+        render_cards(chars, mascot, trophy)
     if "--render" in args:
-        for i, c in enumerate(chars):
+        for i, c in enumerate(chars.values()):
             c.location.x = (i - 1.5) * 1.9
             c.location.y = -19
         ball.location = (0, -21, 0.17)

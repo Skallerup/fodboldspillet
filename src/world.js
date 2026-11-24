@@ -3,7 +3,8 @@
 import * as THREE from 'three';
 import { GLTFLoader } from 'three/addons/loaders/GLTFLoader.js';
 
-export const FIGURER = { rhino: 'Næsehorn', lion: 'Løve', croc: 'Krokodille', panda: 'Panda' };
+export const FIGURER = { rhino: 'Næsehorn', lion: 'Løve', croc: 'Krokodille', panda: 'Panda', shark: 'Haj', dragon: 'Drage', robot: 'Robot' };
+export const GRUNDFIGURER = ['rhino', 'lion', 'croc', 'panda'];   // resten låses op i spillet
 const GOAL_Z = 29, SPOT_Z = 23, GOAL_HW = 5, GOAL_H = 3.4, BALL_R = 0.17;
 const START_Z = -18, STEP = 3.6;
 const lerp = (a, b, k) => a + (b - a) * k;
@@ -221,10 +222,17 @@ export class World {
     this.snap = true;
   }
 
-  async load(onProgress) {
+  /** Hent en figur, hvis den ikke allerede er hentet (de hemmelige figurer hentes først, når de skal bruges). */
+  loadFigur(kind) {
+    if (this.assets[kind]) return Promise.resolve();
+    this.pending ||= {};
+    return (this.pending[kind] ||= new GLTFLoader().loadAsync(`assets/models/char_${kind}.glb`).then((g) => { this.assets[kind] = g.scene; }));
+  }
+
+  async load(onProgress, ekstra = []) {
     const loader = new GLTFLoader();
     const files = { stadium: 'stadium.glb', ball: 'ball.glb', trophy: 'trophy.glb', mascot: 'mascot.glb' };
-    for (const k of Object.keys(FIGURER)) files[k] = `char_${k}.glb`;
+    for (const k of new Set([...GRUNDFIGURER, ...ekstra])) files[k] = `char_${k}.glb`;
     let done = 0;
     const total = Object.keys(files).length;
     await Promise.all(Object.entries(files).map(async ([k, f]) => {
@@ -369,9 +377,8 @@ export class World {
     p.setKit(kit);
     p.root.position.set(0, 0, START_Z);
     p.play('idle');
-    const kinds = Object.keys(FIGURER).filter((k) => k !== kind);
-    this.rivalKinds = kinds;
-    const d = this.defender = this.figur('defender', kinds[0]);
+    const kinds = Object.keys(FIGURER).filter((k) => k !== kind && this.assets[k]);
+    const d = this.defender = this.figur('defender', kinds[Math.floor(Math.random() * kinds.length)]);
     const mk = this.modstanderKit(kit);
     d.setKit({ ...mk, nummer: 4 });
     d.root.position.set(0, 0, START_Z + 3.3);
@@ -434,8 +441,8 @@ export class World {
     const p = this.player = this.figur('player', kind);
     p.setKit(kit);
     this.hide('defender');
-    const kinds = Object.keys(FIGURER).filter((k) => k !== kind);
-    const g = this.goalie = this.figur('keeper', kinds[kinds.length - 1]);
+    const kinds = Object.keys(FIGURER).filter((k) => k !== kind && this.assets[k]);
+    const g = this.goalie = this.figur('keeper', kinds[Math.floor(Math.random() * kinds.length)]);
     g.setKit({ farve1: '#B6F000', farve2: '#15171C', nummer: 1 });
     this.resetSkud();
     this.placerEkstra();
@@ -563,11 +570,11 @@ export class World {
     this.fLife = 0;
     this.scene.add(this.fyr);
   }
-  fyrStart() {
+  fyrStart(z = GOAL_Z + 2) {
     const n = this.fPos.length / 3, bursts = 4, per = n / bursts;
     const pal = [0xffd21f, 0xff4a5a, 0x5fd0ff, 0x7dff9a, 0xffffff].map((c) => new THREE.Color(c));
     for (let b = 0; b < bursts; b++) {
-      const cx = (Math.random() - 0.5) * 20, cy = 5.5 + Math.random() * 3.5, cz = GOAL_Z + 2 + Math.random() * 3;
+      const cx = (Math.random() - 0.5) * 20, cy = 5.5 + Math.random() * 3.5, cz = z + Math.random() * 3;
       const c = pal[Math.floor(Math.random() * pal.length)];
       for (let i = b * per; i < (b + 1) * per; i++) {
         const th = Math.random() * Math.PI * 2, ph = Math.acos(Math.random() * 2 - 1), sp = 4 + Math.random() * 3;

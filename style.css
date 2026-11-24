@@ -176,3 +176,35 @@ table.top { width: 100%; border-collapse: collapse; }
 .buy.use { background: var(--chalk); }
 .need { flex: none; color: #a9b8d0; font-weight: 800; font-size: 0.95rem; }
 .inuse { flex: none; color: var(--flood); font-weight: 800; }
+
+/* ---------- samlekort ---------- */
+.panel.wide { width: min(640px, 100%); }
+.album { display: grid; grid-template-columns: repeat(auto-fill, minmax(118px, 1fr)); gap: 10px; }
+.slot { background: none; border: 0; padding: 0; text-align: inherit; display: block; }
+.kort { aspect-ratio: 5 / 7; display: flex; flex-direction: column; padding: 6px; background: var(--chalk); color: var(--ink);
+  border: 4px solid #c8ccc0; border-radius: 10px; overflow: hidden; font-size: 0.72rem; line-height: 1.15; position: relative; }
+.kort img { flex: 1; min-height: 0; width: 100%; object-fit: contain; background: linear-gradient(#bfe3ff, #6fb7ee 60%, #2f9a55 60%); border-radius: 6px; }
+.kort-top { display: flex; justify-content: space-between; font-weight: 800; padding: 0 2px 3px; }
+.kort-navn { font: 800 italic 1.5em/1 var(--display); text-transform: uppercase; padding-top: 5px; }
+.kort-pos { color: #4a5568; font-weight: 800; }
+.kort-stats { display: flex; justify-content: space-between; gap: 4px; padding-top: 4px; }
+.kort-stats span { display: grid; text-align: center; flex: 1; background: rgb(6 16 31 / 0.08); border-radius: 4px; padding: 2px 0; }
+.kort-stats b { font: 700 1.5em/1 var(--display); }
+.kort.r-sjaelden { background: #dbe9ff; border-color: #2f6fe0; }
+.kort.r-guld { background: linear-gradient(135deg, #fff3b8, #ffd21f 45%, #f0a600); border-color: #b77900; }
+.kort.r-guld img { background: linear-gradient(#fff6c9, #ffd86b 60%, #2f9a55 60%); }
+.kort.mangler { align-items: center; justify-content: center; background: var(--night-2); color: #6f84a8; border-style: dashed; border-color: #34507d; }
+.kort.mangler span { font: 800 italic 2.6rem/1 var(--display); }
+.kort.mangler.r-guld { border-color: #8a6a12; color: #b9973a; }
+.s-pack { align-items: center; justify-content: center; padding: 12px; }
+.callout.pack { max-width: 560px; max-height: 100%; overflow-y: auto; }
+.reveal { width: min(260px, 62vw); font-size: 1.55em; animation: vend 0.7s cubic-bezier(.2, 1.3, .4, 1); }
+.reveal .kort { box-shadow: 0 14px 0 rgb(6 16 31 / 0.5); }
+@keyframes vend { from { transform: perspective(700px) rotateY(180deg) scale(0.5); opacity: 0; } 55% { opacity: 1; } }
+.unlock { background: var(--flood); color: var(--ink); font-weight: 800; padding: 10px 14px; }
+.progress { display: block; height: 8px; background: #2a426b; margin-top: 6px; min-width: 160px; }
+.progress i { display: block; height: 100%; background: var(--flood); }
+.chip.locked { opacity: 0.55; border-style: dashed; border-color: #6f84a8; }
+.acts { display: flex; align-items: center; gap: 8px; flex: none; }
+.need { text-align: right; line-height: 1.2; }
+.buy.use[aria-pressed=true] { background: var(--flood); }

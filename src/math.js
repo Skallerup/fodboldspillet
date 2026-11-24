@@ -230,10 +230,11 @@ function broekExpr(terms, signs, sameDen) {
 
 const GEN = { plus, minus, gange, divider, broek };
 
-/** Lav en opgave. regneart: 'blandet' eller en nøgle fra OPS. klasse 0-10, niveau let/mellem/svaer. */
+/** Lav en opgave. regneart: 'blandet', en nøgle fra OPS eller en liste af nøgler (fx ['plus', 'minus']). klasse 0-10, niveau let/mellem/svaer. */
 export function lavOpgave(regneart, klasse, niveau) {
   const l = Math.max(-1, Math.min(11, klasse + (NIVEAUER[niveau] ?? 0)));
-  const op = regneart === 'blandet' ? pick(Object.keys(OPS)) : regneart;
+  const liste = Array.isArray(regneart) ? regneart : regneart === 'blandet' ? Object.keys(OPS) : [regneart];
+  const op = pick(liste.length ? liste : Object.keys(OPS));
   const q = GEN[op](l);
   q.negativ = l >= 7;
   return q;

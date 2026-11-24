@@ -52,6 +52,7 @@ Alt 3D er lavet med Blender-scripts (Blender 5.x eller Python-modulet `bpy`):
 ```
 python3 tools/blender/build_assets.py            # figurer, bold og stadion til spillet
 python3 tools/blender/build_assets.py --render   # samme, plus et forhåndsbillede
+python3 tools/blender/build_assets.py --cards    # samme, plus billederne til samlekortene
 python3 tools/blender/rhino_player.py --render   # detaljeret næsehorn til nærbilleder
 ```
 
@@ -59,6 +60,11 @@ python3 tools/blender/rhino_player.py --render   # detaljeret næsehorn til nær
 
 Point bruges i butikken på: trøjemønstre, bolde, støvler, målfejringer, stadion (projektører, store tribuner, tag),
 tilskuere (maskotten Ørni, flag i holdets farver, fyrværkeri) og pokaler. Kataloget og priserne står i `src/shop.js`.
+
+## Samlekort og hemmelige figurer
+
+Efter hver kamp får man en kortpakke med ét af 24 samlekort (almindelige, sjældne og guld). Kortene samles i albummet.
+Haj, drage og robot er hemmelige figurer, der låses op ved at score 15 mål, svare rigtigt på 150 opgaver eller samle 10 forskellige kort.
 
 ## Idéer til senere
 
