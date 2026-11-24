@@ -1,7 +1,7 @@
 // Lydeffekter lavet med Web Audio (ingen lydfiler) og oplæsning med browserens danske stemme.
 let ctx = null;
 let on = true;
-export function setLyd(v) { on = v; if (!v && pub) pub.gain.value = 0; }
+export function setLyd(v) { on = v; }
 
 function ac() {
   if (!ctx) { const C = window.AudioContext || window.webkitAudioContext; if (C) ctx = new C(); }
@@ -19,49 +19,24 @@ function tone(freq, start, dur, type = 'sine', vol = 0.18, slide = 0) {
   g.gain.exponentialRampToValueAtTime(0.0001, t + dur);
   o.connect(g).connect(c.destination); o.start(t); o.stop(t + dur + 0.05);
 }
-function noise(start, dur, vol, freq, q = 0.8) {
-  const c = ac(); if (!c || !on) return;
-  const len = Math.floor(c.sampleRate * dur);
-  const buf = c.createBuffer(1, len, c.sampleRate);
-  const d = buf.getChannelData(0);
-  for (let i = 0; i < len; i++) d[i] = Math.random() * 2 - 1;
-  const src = c.createBufferSource(); src.buffer = buf;
-  const f = c.createBiquadFilter(); f.type = 'bandpass'; f.frequency.value = freq; f.Q.value = q;
-  const g = c.createGain(); const t = c.currentTime + start;
-  g.gain.setValueAtTime(0.0001, t);
-  g.gain.exponentialRampToValueAtTime(vol, t + dur * 0.25);
-  g.gain.exponentialRampToValueAtTime(0.0001, t + dur);
-  src.connect(f).connect(g).connect(c.destination); src.start(t);
-}
+// Alle lyde er rene toner. Tidligere blev publikum, jubel og spark lavet af filtreret støj,
+// og det lød som sus i højttaleren, så støjen er fjernet helt.
 export const lyd = {
   klik: () => tone(520, 0, 0.06, 'triangle', 0.08),
   rigtigt: () => { tone(523, 0, 0.12, 'triangle'); tone(659, 0.1, 0.12, 'triangle'); tone(784, 0.2, 0.2, 'triangle'); },
-  forkert: () => { tone(220, 0, 0.18, 'sawtooth', 0.1, -80); tone(165, 0.16, 0.25, 'sawtooth', 0.1, -60); },
-  spark: () => { noise(0, 0.12, 0.5, 180, 1.2); tone(120, 0, 0.1, 'sine', 0.3, -60); },
-  floejte: () => { tone(2100, 0, 0.18, 'square', 0.06); tone(2100, 0.24, 0.5, 'square', 0.06); },
-  jubel: () => { noise(0, 2.4, 0.35, 900, 0.5); noise(0.1, 2.0, 0.2, 1800, 0.7); [523, 659, 784, 1047].forEach((f, i) => tone(f, i * 0.12, 0.3, 'triangle', 0.14)); },
-  aah: () => { noise(0, 1.0, 0.18, 500, 0.6); tone(300, 0, 0.5, 'sine', 0.08, -120); },
-  stolpe: () => { tone(880, 0, 0.3, 'square', 0.12, -200); noise(0, 0.9, 0.15, 500, 0.6); },
+  forkert: () => { tone(196, 0, 0.16, 'triangle', 0.14); tone(147, 0.15, 0.24, 'triangle', 0.14); },
+  spark: () => { tone(150, 0, 0.12, 'sine', 0.32, -90); tone(900, 0, 0.03, 'triangle', 0.06); },
+  floejte: () => { tone(1800, 0, 0.14, 'sine', 0.09); tone(1800, 0.2, 0.34, 'sine', 0.09); },
+  jubel: () => {
+    [523, 659, 784, 1047].forEach((f, i) => tone(f, i * 0.11, 0.22, 'triangle', 0.14));
+    [523, 659, 784, 1047].forEach((f) => tone(f, 0.46, 0.6, 'triangle', 0.09));
+  },
+  aah: () => { tone(392, 0, 0.2, 'sine', 0.1); tone(330, 0.18, 0.2, 'sine', 0.1); tone(262, 0.36, 0.4, 'sine', 0.1); },
+  stolpe: () => { tone(1320, 0, 0.35, 'sine', 0.12); tone(1980, 0, 0.2, 'sine', 0.06); },
 };
 
-// Publikum: en vedvarende summen, der bliver højere, når det går godt (niveau 0-1; 0 slukker)
-let pub = null;
-export function publikum(niveau) {
-  const c = ac();
-  if (!c) return;
-  if (!pub) {
-    const len = c.sampleRate * 2;
-    const buf = c.createBuffer(1, len, c.sampleRate);
-    const d = buf.getChannelData(0);
-    for (let i = 0; i < len; i++) d[i] = Math.random() * 2 - 1;
-    const src = c.createBufferSource(); src.buffer = buf; src.loop = true;
-    const f = c.createBiquadFilter(); f.type = 'bandpass'; f.frequency.value = 700; f.Q.value = 0.4;
-    const g = c.createGain(); g.gain.value = 0;
-    src.connect(f).connect(g).connect(c.destination); src.start();
-    pub = g;
-  }
-  pub.gain.setTargetAtTime(on ? niveau * 0.1 : 0, c.currentTime, 0.5);
-}
+/** Publikumslyd er slået fra: den var lavet af støj og lød dårligt. Funktionen findes stadig, så resten af spillet ikke skal ændres. */
+export function publikum() {}
 
 let stemme = null;
 function findStemme() {
