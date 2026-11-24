@@ -288,3 +288,19 @@ table.top { width: 100%; border-collapse: collapse; }
   .top td:first-child { color: #000; }
   .row { display: none; }
 }
+
+/* ---------- kortduel ---------- */
+.row.midt { justify-content: center; }
+.callout.kd { max-width: 620px; width: 100%; gap: 10px; }
+.callout.kd .row.spread { width: 100%; }
+.kdscore { font: 800 italic 1.6rem/1 var(--display); color: var(--flood); }
+.kdbord { display: flex; gap: 16px; justify-content: center; width: 100%; }
+.kdbord > div { width: min(190px, 40vw); font-size: 1.1em; }
+.kort.bagside { align-items: center; justify-content: center; border-color: var(--flood);
+  background: repeating-linear-gradient(45deg, #132a4d 0 12px, #1b3a69 12px 24px); }
+.kort.bagside span { font: 800 italic 4rem/1 var(--display); color: var(--flood); }
+.kort-stats span.valgt { background: var(--ink); color: var(--flood); outline: 3px solid var(--flood); }
+.q.lille { font-size: clamp(2rem, 6vw, 3rem); padding: 0; }
+.callout.kd .choices { width: 100%; }
+.callout.kd .choice { min-height: 56px; font-size: 2rem; }
+.quit { background: none; border: 2px solid rgb(255 255 255 / 0.4); padding: 6px 12px; font-weight: 800; min-height: 40px; }

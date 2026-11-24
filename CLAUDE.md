@@ -34,6 +34,8 @@ Dansk 3D-matematikspil til børn (0.-10. klasse) med fodboldtema. Statisk hjemme
 
 - `src/cards.js` og `assets/cards/cards.json`: 24 samlekort. Man får en pakke pr. færdigspillet kamp (`me.pakker`), dubletter veksles til point. Billederne renderes med `build_assets.py --cards`.
 - `LAASE` i `src/shop.js`: haj (15 mål), drage (150 rigtige svar) og robot (10 forskellige kort). De hentes først, når de skal bruges (`World.loadFigur`).
+- Sæt (`SAET` i `cards.js`): alle tre kort af et dyr giver en sættrøje (`saet_<dyr>` i `VALG.troeje`, uden pris), som `udstyr(p)` lægger i `ejet`. Mønstrene laves med `build_assets.py --kits`.
+- Kortduel (`startKortduel`, `kd` i `main.js`): fem runder mod computeren; man vælger fart, skud eller hjerne, og et rigtigt svar lægger `KD_BONUS` (15) til. Rundens vinder vælger tal næste gang.
 - Regnearter vælges som liste i `me.regnearter` (fx `['plus', 'minus']`); `arter(p)` i `main.js` oversætter ældre gemte spillere.
 - Butikken har forhåndsvisning (`proeve` i `main.js`): viser varen på spilleren uden at ændre det gemte.
 

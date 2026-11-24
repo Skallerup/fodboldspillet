@@ -81,6 +81,8 @@ tilskuere og pokaler. Stadion, tilskuere og pokalrum har ti levels hver, og hver
 ## Samlekort og hemmelige figurer
 
 Efter hver kamp får man en kortpakke med ét af 24 samlekort (almindelige, sjældne og guld). Kortene samles i albummet.
+Kortene bruges i kortduel mod computeren: man vælger fart, skud eller hjerne, og et rigtigt svar på en opgave lægger 15 til tallet.
+Alle tre kort af samme dyr giver en særlig trøje, der ikke kan købes.
 Haj, drage og robot er hemmelige figurer, der låses op ved at score 15 mål, svare rigtigt på 150 opgaver eller samle 10 forskellige kort.
 
 ## Turnering, superskud og dagens udfordring

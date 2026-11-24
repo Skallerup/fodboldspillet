@@ -1,4 +1,5 @@
 // Butikken: hvad man kan købe for sine point, og hvad spilleren ejer og bruger.
+import { SAET, harSaet, antalKort } from './cards.js';
 
 /** Ting man opgraderer i ti levels. Level 1 har man fra start; hvert level gør det større og flottere. */
 const trin = (navne, priser) => navne.map(([navn, tekst], i) => ({ navn, tekst, pris: priser[i] }));
@@ -50,6 +51,8 @@ export const VALG = {
     skraa: { navn: 'Skråbånd', pris: 750 },
     tern: { navn: 'Tern', pris: 750 },
     guld: { navn: 'Guldtrøjen', pris: 1800 },
+    // sættrøjer: kan ikke købes, men fås ved at samle alle tre kort af et dyr
+    ...Object.fromEntries(Object.entries(SAET).map(([figur, navn]) => [`saet_${figur}`, { navn, saet: figur }])),
   } },
   bold: { navn: 'Bold', ting: {
     klassisk: { navn: 'Klassisk', pris: 0 },
@@ -89,6 +92,7 @@ export function udstyr(p) {
     const gratis = Object.keys(kat.ting)[0];
     if (!Array.isArray(o.ejet[k])) o.ejet[k] = [];
     if (!o.ejet[k].includes(gratis)) o.ejet[k].unshift(gratis);
+    for (const [id, t] of Object.entries(kat.ting)) if (t.saet && harSaet(p, t.saet) && !o.ejet[k].includes(id)) o.ejet[k].push(id);
     if (!o.ejet[k].includes(o.valgt[k])) o.valgt[k] = gratis;
   }
   return o;
@@ -114,7 +118,7 @@ export function koebTrin(p, k) {
 export function koebTing(p, k, id) {
   const o = udstyr(p);
   const ting = VALG[k].ting[id];
-  if (!ting || o.ejet[k].includes(id) || p.point < ting.pris) return false;
+  if (!ting || ting.saet || o.ejet[k].includes(id) || p.point < ting.pris) return false;
   p.point -= ting.pris;
   o.ejet[k].push(id);
   o.valgt[k] = id;
@@ -128,7 +132,6 @@ export function brugTing(p, k, id) {
 }
 
 // ---- hemmelige figurer, der låses op ved at nå et mål
-import { antalKort } from './cards.js';
 export const LAASE = {
   shark: { tekst: 'Scor 15 mål i finaler', status: (p) => [p.maal | 0, 15] },
   dragon: { tekst: 'Svar rigtigt på 150 opgaver', status: (p) => [p.rigtige | 0, 150] },

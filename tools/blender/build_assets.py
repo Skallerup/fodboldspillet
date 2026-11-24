@@ -5,6 +5,7 @@ Koer:
 eller med bpy-modulet:
     python tools/blender/build_assets.py [--render] [--cards]
     python tools/blender/build_assets.py --lite     (lette figurer: char_<navn>_lite.glb)
+    python tools/blender/build_assets.py --kits     (kun troejemoenstre i assets/kits/)
 
 Output (assets/models/):
     char_rhino.glb, char_lion.glb, char_croc.glb, char_panda.glb
@@ -111,6 +112,67 @@ def kit_textures(n=512):
     gold = np.array([1.0, 0.76, 0.22])[None, None, :] * (0.80 + 0.22 * lines * shade)[..., None]
     gold[np.abs(diag - 0.5) < 0.09] = (1.0, 0.95, 0.72)
     _save_jpg(os.path.join(out, "guld.jpg"), gold)
+    set_textures(out, u, v, grain)
+
+
+def set_textures(out, u, v, grain):
+    """Syv saettroejer i fulde farver: praemien for at samle alle tre kort af et dyr. Gemmes som assets/kits/saet_<dyr>.jpg.
+    Troejens UV er u = bredde (brystets midte ved 0.5625) og v = hoejde, hvor moenstret gentages for hver 1.0."""
+    n = u.shape[0]
+    cu = (u - 0.5625 + 0.5) % 1.0 - 0.5          # afstand fra brystets midte
+    t = (v - 0.8) % 1.0                           # 0 ved troejens kant forneden, 1 ved kraven
+    cv = (v - 0.25 + 0.5) % 1.0 - 0.5            # afstand fra brystets midte i hoejden
+    shade = (0.93 + 0.12 * grain)[..., None]
+    col = lambda *c: np.array(c)[None, None, :]
+    mix = lambda a, b, m: a * (1 - m[..., None]) + b * m[..., None]
+
+    # naesehorn: panserplader med nitter
+    gx, gy = (u * 4) % 1.0, (v * 4) % 1.0
+    kant = ((gx < 0.06) | (gy < 0.06)).astype(float)
+    nitte = (((gx - 0.18) ** 2 + (gy - 0.18) ** 2) < 0.006).astype(float)
+    img = mix(col(0.50, 0.54, 0.60) * (0.85 + 0.3 * gy[..., None]), col(0.16, 0.18, 0.22), kant)
+    img = mix(img, col(0.85, 0.87, 0.90), nitte)
+    _save_jpg(os.path.join(out, "saet_rhino.jpg"), img * shade)
+
+    # loeve: solstraaler fra brystets midte
+    vinkel = np.arctan2(cv, cu)
+    straale = (np.sin(vinkel * 12) > 0).astype(float)
+    img = mix(col(0.98, 0.72, 0.10), col(0.86, 0.36, 0.04), straale)
+    img = mix(img, col(0.45, 0.16, 0.02), (np.hypot(cu, cv) < 0.10).astype(float))
+    _save_jpg(os.path.join(out, "saet_lion.jpg"), img * shade)
+
+    # krokodille: store skael
+    row = np.floor(v * 10)
+    cell = (np.abs(np.sin(np.pi * (u * 10 + 0.5 * (row % 2)))) * np.abs(np.sin(np.pi * v * 10))) ** 0.5
+    img = mix(col(0.04, 0.26, 0.08), col(0.36, 0.78, 0.20), cell)
+    _save_jpg(os.path.join(out, "saet_croc.jpg"), img * shade)
+
+    # panda: sort og hvid halvdel med en groen bambusstribe
+    img = mix(col(0.96, 0.96, 0.94), col(0.05, 0.05, 0.06), (cu > 0).astype(float))
+    img = mix(img, col(0.30, 0.70, 0.22), (np.abs(cu) < 0.035).astype(float))
+    _save_jpg(os.path.join(out, "saet_panda.jpg"), img * shade)
+
+    # haj: blaa med boelger og en raekke hvide taender
+    boelge = (np.sin((v * 8 + 0.35 * np.sin(u * 2 * np.pi * 3)) * 2 * np.pi) > 0.6).astype(float)
+    img = mix(col(0.08, 0.30, 0.62), col(0.20, 0.52, 0.86), boelge)
+    tand = ((np.abs(t - 0.55) < 0.07 * (1 - np.abs(((u * 9) % 1.0) - 0.5) * 2))).astype(float)
+    img = mix(img, col(0.97, 0.97, 0.97), tand)
+    _save_jpg(os.path.join(out, "saet_shark.jpg"), img * shade)
+
+    # drage: flammer, der slikker op fra kanten
+    flamme = 0.45 + 0.22 * np.sin(u * 2 * np.pi * 5) + 0.10 * np.sin(u * 2 * np.pi * 13 + 1.0)
+    img = mix(col(0.10, 0.02, 0.02), col(0.90, 0.12, 0.03), (t < flamme).astype(float))
+    img = mix(img, col(1.0, 0.55, 0.05), (t < flamme * 0.62).astype(float))
+    img = mix(img, col(1.0, 0.90, 0.25), (t < flamme * 0.30).astype(float))
+    _save_jpg(os.path.join(out, "saet_dragon.jpg"), img * shade)
+
+    # robot: moerk med lysende kredsloeb
+    lx, ly = (u * 6) % 1.0, (v * 6) % 1.0
+    linje = (((lx < 0.07) & ((np.floor(v * 6) % 2) == 0)) | ((ly < 0.07) & ((np.floor(u * 6) % 3) != 0))).astype(float)
+    knude = (((lx - 0.035) ** 2 + (ly - 0.035) ** 2) < 0.012).astype(float)
+    img = mix(col(0.07, 0.09, 0.14) + 0 * u[..., None], col(0.10, 0.80, 0.95), linje)
+    img = mix(img, col(0.85, 1.0, 1.0), knude)
+    _save_jpg(os.path.join(out, "saet_robot.jpg"), img * shade)
 
 
 def _save_jpg(path, rgb):
@@ -1048,6 +1110,9 @@ def main():
     os.makedirs(PREVIEWS, exist_ok=True)
     bpy.ops.wm.read_factory_settings(use_empty=True)
     rp.LITE = "--lite" in args
+    if "--kits" in args:      # kun troejemoenstrene (hurtigt)
+        kit_textures()
+        return
     tex = make_textures()
     if rp.LITE:   # kun figurerne, i en let udgave: char_<navn>_lite.glb
         for kind in ANIMALS:

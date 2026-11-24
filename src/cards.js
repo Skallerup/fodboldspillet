@@ -17,6 +17,12 @@ export function samling(p) {
 }
 export const antalKort = (p) => KORT.filter((k) => samling(p)[k.id]).length;
 
+/** Sæt: de tre kort af samme dyr (fx rhino1, rhino2, rhino3). Et fuldt sæt giver en trøje, der ikke kan købes. */
+export const SAET = { rhino: 'Pansertrøjen', lion: 'Løvetrøjen', croc: 'Skæltrøjen', panda: 'Pandatrøjen', shark: 'Hajtrøjen',
+  dragon: 'Flammetrøjen', robot: 'Robottrøjen' };
+export const saetStatus = (p, figur) => [1, 2, 3].filter((i) => samling(p)[figur + i]).length;
+export const harSaet = (p, figur) => saetStatus(p, figur) === 3;
+
 /** Åbn en pakke: giver { kort, nyt, point }. Dubletter veksles til point. */
 export function traekKort(p, tilfaeldig = Math.random) {
   const ejet = samling(p);

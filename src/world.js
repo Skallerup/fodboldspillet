@@ -79,7 +79,8 @@ class Figur {
     const j = this.mats.Jersey;
     if (j) {
       j.map = troeje === 'striber' ? this.stribeMap : kitMap(troeje);
-      j.color.copy(troeje === 'guld' ? new THREE.Color(0xffffff) : c1);
+      const fuldFarve = troeje === 'guld' || troeje.startsWith('saet_');   // mønstre i egne farver farves ikke med holdfarven
+      j.color.copy(fuldFarve ? new THREE.Color(0xffffff) : c1);
       j.roughness = troeje === 'guld' ? 0.35 : 0.6;
       j.needsUpdate = true;
     }
@@ -93,10 +94,13 @@ class Figur {
     else if (Math.abs(lum(c1) - lum(c2)) < 0.25) ink = lum(c1) > 0.5 ? '#10151f' : '#ffffff';
     const g = this.canvas.getContext('2d');
     g.clearRect(0, 0, 256, 256);
+    const saet = troeje.startsWith('saet_');
+    if (saet) ink = '#ffffff';
     g.fillStyle = ink;
     g.font = '800 190px "Barlow Condensed", "Arial Narrow", Impact, sans-serif';
     g.textAlign = 'center';
     g.textBaseline = 'middle';
+    if (saet) { g.lineWidth = 16; g.lineJoin = 'round'; g.strokeStyle = '#10151f'; g.strokeText(String(nummer), 128, 140); }
     g.fillText(String(nummer), 128, 140);
     this.numTex.needsUpdate = true;
   }
