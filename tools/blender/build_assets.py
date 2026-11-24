@@ -11,7 +11,9 @@ Output (assets/models/):
         Materialerne Jersey, Shorts, Socks, Trim og Number farves/udskiftes i spillet.
     ball.glb
     stadium.glb
-        Dele: Pitch, Ground, Goal, Goal2, Boards, Flags, Trees, StandsSmall, StandsBig, Roof, Floodlights
+        Dele: Pitch, Ground, Goal, Goal2, Boards, Flags, Trees, StandsSmall, StandsBig, Roof, Banners, Floodlights
+    trophy.glb (Cup, Stand), mascot.glb (MascotBody, WingL, WingR)
+    assets/kits/*.jpg (troejemoenstre)
 """
 import math
 import os
@@ -80,6 +82,39 @@ def make_textures(n=512):
     grey = (1.0 - 0.30 * stripe) * (0.95 + 0.08 * grain)
     tex["jersey"] = rp._save("g_jersey", np.repeat(grey[..., None], 3, -1))
     return tex
+
+
+def kit_textures(n=512):
+    """Graatonede troejemoenstre til butikken (farves i spillet). Gemmes i assets/kits/."""
+    out = os.path.join(rp.ROOT, "assets", "kits")
+    os.makedirs(out, exist_ok=True)
+    grain = rp._fractal(n, 0.7, 3)
+    u, v = np.meshgrid(np.arange(n) / n, np.arange(n) / n)
+    shade = 0.95 + 0.08 * grain
+    diag = (u + v) % 1.0
+    designs = {
+        "ensfarvet": np.ones_like(u),
+        "ringe": 1.0 - 0.32 * (np.floor(v * 8) % 2),
+        "skraa": 1.0 - 0.50 * (np.abs(diag - 0.5) < 0.11),
+        "tern": 1.0 - 0.30 * ((np.floor(u * 6) + np.floor(v * 6)) % 2),
+    }
+    for name, grey in designs.items():
+        rgb = np.repeat((grey * shade)[..., None], 3, -1)
+        _save_jpg(os.path.join(out, name + ".jpg"), rgb)
+    lines = 0.5 + 0.5 * np.sin(2 * np.pi * (u - v) * 24)
+    gold = np.array([1.0, 0.76, 0.22])[None, None, :] * (0.80 + 0.22 * lines * shade)[..., None]
+    gold[np.abs(diag - 0.5) < 0.09] = (1.0, 0.95, 0.72)
+    _save_jpg(os.path.join(out, "guld.jpg"), gold)
+
+
+def _save_jpg(path, rgb):
+    h, w, _ = rgb.shape
+    rgba = np.concatenate([np.clip(rgb, 0, 1), np.ones((h, w, 1))], -1).astype(np.float32)
+    img = bpy.data.images.new(os.path.basename(path), w, h, alpha=False)
+    img.pixels.foreach_set(rgba.ravel())
+    img.filepath_raw = path
+    img.file_format = "JPEG"
+    img.save()
 
 
 def pitch_texture():
@@ -423,6 +458,74 @@ def build_character(kind, tex):
     return root
 
 
+# ---------------------------------------------------------------- pokal og maskot
+def build_trophy():
+    """Pokal (Cup) og bord (Stand). Pokalen farves bronze/soelv/guld i spillet."""
+    bpy.ops.object.empty_add(location=(0, 0, 0))
+    root = bpy.context.object
+    root.name = "Trophy"
+    gold = mat("Cup", (1.0, 0.74, 0.18), 0.25)
+    inner = mat("CupInner", (0.35, 0.22, 0.03), 0.5)
+    wood = mat("CupBase", (0.13, 0.07, 0.04), 0.6)
+    g = []
+    limb("Base", (0, 0, 0), (0, 0, 0.12), 0.22, 0.20, wood, g, caps=False)
+    limb("Stem", (0, 0, 0.12), (0, 0, 0.42), 0.055, 0.04, gold, g, caps=False)
+    blob("Knob", (0, 0, 0.27), (0.075, 0.075, 0.05), gold, g)
+    limb("Bowl", (0, 0, 0.40), (0, 0, 0.86), 0.07, 0.27, gold, g, caps=False)
+    ring("Rim", (0, 0, 0.86), (0, 0, 1), 0.27, 0.025, gold, g)
+    blob("Inside", (0, 0, 0.855), (0.25, 0.25, 0.015), inner, g)
+    for s in (-1, 1):
+        ring("Handle", (0.30 * s, 0, 0.66), (0, 1, 0), 0.12, 0.024, gold, g)
+    for o in g:
+        rp._smooth(o)
+    join("Cup", g).parent = root
+    g = []
+    box("Top", (0, 0, 0.90), (2.9, 0.75, 0.08), wood, g)
+    for x in (-1.3, 1.3):
+        for y in (-0.28, 0.28):
+            box("Leg", (x, y, 0.43), (0.09, 0.09, 0.86), wood, g)
+    box("Cloth", (0, 0, 0.945), (2.5, 0.5, 0.012), mat("CupCloth", (0.75, 0.06, 0.10), 0.8), g)
+    join("Stand", g).parent = root
+    return root
+
+
+def build_mascot():
+    """Maskotten Oerni: en stor gul fugl med bevaegelige vinger (WingL, WingR)."""
+    bpy.ops.object.empty_add(location=(0, 0, 0))
+    root = bpy.context.object
+    root.name = "Mascot"
+    yellow = mat("MascotYellow", (0.98, 0.78, 0.08), 0.8)
+    dark = mat("MascotDark", (0.80, 0.45, 0.02), 0.8)
+    orange = mat("MascotOrange", (0.95, 0.40, 0.03), 0.5)
+    white = mat("White", (0.95, 0.95, 0.95), 0.4)
+    M = dict(white=white, iris=mat("Iris", (0.25, 0.12, 0.03), 0.2), black=mat("Black", (0.01, 0.01, 0.01), 0.2))
+    g, hard = [], []
+    blob("Body", (0, 0, 1.0), (0.58, 0.52, 0.72), yellow, g)
+    blob("Head", (0, -0.05, 1.92), (0.46, 0.43, 0.43), yellow, g)
+    body = fuse("MascotSkin", g, yellow, None, voxel=0.022, smooth=5, keep=0.15)
+    blob("Belly", (0, -0.30, 0.95), (0.40, 0.28, 0.52), white, hard)
+    limb("Beak", (0, -0.42, 1.86), (0, -0.86, 1.78), 0.17, 0.02, orange, hard, caps=False)
+    for s in (-1, 1):
+        eye(hard, body, 0.17 * s, 2.02, M, size=1.15)
+        blob("Brow", (0.17 * s, -0.40, 2.17), (0.13, 0.05, 0.035), dark, hard, rot=(0, math.radians(-20 * s), 0))
+        limb("Leg", (0.22 * s, 0, 0.40), (0.22 * s, 0, 0.06), 0.06, 0.05, orange, hard, caps=False)
+        blob("Foot", (0.22 * s, -0.14, 0.06), (0.20, 0.30, 0.06), orange, hard)
+    for x, h in ((-0.12, 0.26), (0.0, 0.36), (0.12, 0.26)):
+        limb("Tuft", (x, 0.02, 2.28), (x * 1.6, 0.10, 2.28 + h), 0.07, 0.01, dark, hard, caps=False)
+    for i in range(3):
+        limb("TailFeather", (0, 0.42, 0.75), ((i - 1) * 0.25, 0.80, 0.95 + 0.1 * (i == 1)), 0.10, 0.02, dark, hard, caps=False)
+    o = join("MascotBody", [body] + hard)
+    o.parent = root
+    for s, side in ((1, "L"), (-1, "R")):
+        w = []
+        blob("Wing", (0.66 * s, 0.0, 1.10), (0.14, 0.30, 0.50), dark, w, rot=(0, math.radians(-16 * s), 0))
+        blob("WingTip", (0.74 * s, 0.02, 0.72), (0.10, 0.22, 0.24), yellow, w, rot=(0, math.radians(-16 * s), 0))
+        wo = join("Wing" + side, w)
+        set_pivot(wo, (0.52 * s, 0, 1.50))
+        wo.parent = root
+    return root
+
+
 # ---------------------------------------------------------------- stadion
 def box(name, loc, size, material, group, rot=(0, 0, 0)):
     bpy.ops.mesh.primitive_cube_add(size=1, location=loc, rotation=rot)
@@ -601,6 +704,22 @@ def build_stadium():
     parts["StandsBig"] = big
     parts["Roof"] = roof
 
+    # flag i spillerens farver (farves i spillet)
+    g = []
+    f1, f2 = mat("TeamFlag1", (0.85, 0.08, 0.10), 0.7), mat("TeamFlag2", (0.95, 0.95, 0.95), 0.7)
+    k = 0
+    for sx in (-1, 1):
+        for y in range(-24, 25, 8):
+            limb("BannerPole", (31 * sx, y, 4.2), (31 * sx, y, 8.6), 0.08, 0.06, steel, g, caps=False)
+            box("Banner", (31 * sx, y + 1.45, 7.6), (0.06, 2.8, 1.8), (f1, f2)[k % 2], g)
+            k += 1
+    for sy in (-1, 1):
+        for x in range(-16, 17, 8):
+            limb("BannerPole", (x, 43 * sy, 4.2), (x, 43 * sy, 8.6), 0.08, 0.06, steel, g, caps=False)
+            box("Banner", (x + 1.45, 43 * sy, 7.6), (2.8, 0.06, 1.8), (f1, f2)[k % 2], g)
+            k += 1
+    parts["Banners"] = g
+
     g = []
     lamp = mat("Lamp", (1.0, 0.97, 0.85), 0.3)
     bsdf = lamp.node_tree.nodes["Principled BSDF"]
@@ -673,6 +792,9 @@ def main():
         chars.append(root)
     ball = rp.build_ball(loc=(0, 0, 0))
     export(ball, os.path.join(MODELS, "ball.glb"))
+    kit_textures()
+    export(build_trophy(), os.path.join(MODELS, "trophy.glb"))
+    export(build_mascot(), os.path.join(MODELS, "mascot.glb"))
     stadium = build_stadium()
     print("TRIANGLES stadium", rp.triangles(stadium))
     export(stadium, os.path.join(MODELS, "stadium.glb"))

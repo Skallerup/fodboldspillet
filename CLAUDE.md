@@ -23,6 +23,12 @@ Dansk 3D-matematikspil til børn (0.-10. klasse) med fodboldtema. Statisk hjemme
 - Kun lokal lagring: ingen login, ingen server. Bygges så online topscore kan kobles på senere.
 - Sprog i brugerfladen: dansk, korte sætninger, ingen engelske ord.
 
-## Næste etape
+## Butik og opgraderinger
 
-Butik med opgraderinger (stadion, tøj, bold, støvler, målfejringer, tilskuere/maskot, pokalskab). `World.setStadion(niveau)` viser allerede flere stadion-dele pr. niveau.
+- `src/shop.js`: `TRIN` (stadion, tilskuere, pokaler: købes ét trin ad gangen) og `VALG` (trøje, bold, støvler, jubel: ejes og vælges). `udstyr(p)` giver spillerens udstyr med standardværdier.
+- `World.setUdstyr(o, kit)` anvender udstyret: stadion-dele, flag (`Banners`), boldfarver, pokaler, maskot. `Figur.setKit` tager trøjemønster (`assets/kits/*.jpg`), støvlefarve og målfejring.
+- Nye ting til butikken: tilføj i `shop.js`, og lav udseendet i `world.js` (farver) eller `build_assets.py` (nye 3D-dele).
+
+## Idéer til senere
+
+Lettere modeller til langsomme enheder, fælles topscore online, flere figurer.

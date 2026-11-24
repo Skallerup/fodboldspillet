@@ -31,6 +31,8 @@ python3 -m http.server 8000
 | `src/world.js` | 3D-verdenen: figurer, animationer, kamp og straffespark (Three.js) |
 | `src/math.js` | Opgaver for alle klassetrin og regnearter |
 | `src/storage.js` | Spillere, point og topscore |
+| `src/shop.js` | Butikkens katalog, priser og køb |
+| `assets/kits/` | Trøjemønstre (lavet af Blender-scriptet) |
 | `src/audio.js` | Lydeffekter og oplæsning |
 | `assets/models/` | 3D-modeller (.glb) lavet i Blender |
 | `tools/blender/` | Blender-scripts, der bygger modellerne |
@@ -53,8 +55,12 @@ python3 tools/blender/build_assets.py --render   # samme, plus et forhåndsbille
 python3 tools/blender/rhino_player.py --render   # detaljeret næsehorn til nærbilleder
 ```
 
-## Næste etape
+## Butikken
 
-- Butik, hvor point bruges på opgraderinger: stadion, tøj, bold, støvler, målfejringer, tilskuere og pokalskab.
-  Stadion-modellen har allerede delene `StandsBig`, `Roof` og `Floodlights`, som er skjult fra start (`World.setStadion`).
+Point bruges i butikken på: trøjemønstre, bolde, støvler, målfejringer, stadion (projektører, store tribuner, tag),
+tilskuere (maskotten Ørni, flag i holdets farver, fyrværkeri) og pokaler. Kataloget og priserne står i `src/shop.js`.
+
+## Idéer til senere
+
 - Lettere modeller til langsomme enheder.
+- Fælles topscoreliste på tværs af enheder.

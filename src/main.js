@@ -3,6 +3,7 @@ import { World, FIGURER } from './world.js';
 import * as db from './storage.js';
 import { lavOpgave, svarmuligheder, laesSvar, text as fTekst, html as fHtml, same, OPS } from './math.js';
 import { lyd, setLyd, sig, stopTale } from './audio.js';
+import { TRIN, VALG, udstyr, koebTrin, koebTing, brugTing } from './shop.js';
 
 const ui = document.getElementById('ui');
 const stage = document.getElementById('stage');
@@ -19,7 +20,9 @@ let kamp = null;     // den igangværende kamp
 let draft = null;    // spiller under oprettelse/redigering
 
 const esc = (s) => String(s ?? '').replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
-const kit = (p) => ({ farve1: p.farve1, farve2: p.farve2, nummer: p.nummer });
+const kit = (p) => ({ farve1: p.farve1, farve2: p.farve2, nummer: p.nummer, ...udstyr(p).valgt });
+/** Vis spilleren i omklædningsrummet med alt det udstyr, spilleren har købt. */
+function hero(p) { world.showHero(p.figur, kit(p)); world.setUdstyr(udstyr(p), kit(p)); }
 const btn = (a, label, cls = '', extra = '') => `<button class="btn ${cls}" data-a="${a}" ${extra}><span>${label}</span></button>`;
 const klasseNavn = (k) => `${k}. klasse`;
 const wait = (ms) => new Promise((r) => setTimeout(r, ms));
@@ -36,7 +39,7 @@ function skaermSpillere() {
   kamp = null;
   const list = db.profiler();
   const first = list[0];
-  if (first) world.showHero(first.figur, kit(first));
+  if (first) hero(first);
   show('s-profiles', `<div class="panel">
     <h1>Hvem skal på banen?</h1>
     <div class="list">${list.map((p) => kort(p, 'vaelg')).join('')}</div>
@@ -53,7 +56,7 @@ function nyDraft(p) {
 }
 function skaermOpret(fejl = '') {
   const d = draft;
-  world.showHero(d.figur, kit(d));
+  hero(d);
   const chips = (key, opts) => Object.entries(opts).map(([v, l]) =>
     `<button class="chip" data-a="set" data-k="${key}" data-v="${esc(v)}" aria-pressed="${String(d[key]) === String(v)}">${esc(l)}</button>`).join('');
   const sw = (key) => FARVER.map((c) =>
@@ -99,7 +102,7 @@ function skaermHub() {
   kamp = null;
   stopTale();
   setLyd(me.lyd);
-  world.showHero(me.figur, kit(me));
+  hero(me);
   const seg = (key, opts) => Object.entries(opts).map(([v, l]) =>
     `<button class="chip" data-a="indstil" data-k="${key}" data-v="${v}" aria-pressed="${me[key] === v}">${l}</button>`).join('');
   show('s-hub', `<div class="panel">
@@ -107,7 +110,7 @@ function skaermHub() {
       <span class="badge">${esc(me.nummer)}</span>
       <span><b>${esc(me.navn)}</b><small>${esc(me.hold)} · „${esc(me.kampraab)}“</small></span>
       <span class="pts">${me.pointIAlt} p</span></div>
-    ${btn('spil', 'Spil kamp', 'big')}
+    <div class="row">${btn('spil', 'Spil kamp', 'big')}${btn('butik', `Butik · ${me.point} p`, 'ghost')}</div>
     <div class="field"><span class="lbl">Klassetrin</span>
       <div class="stepper"><button data-a="klasse" data-v="-1" aria-label="Lavere klassetrin">−</button>
       <output>${klasseNavn(me.klasse)}</output><button data-a="klasse" data-v="1" aria-label="Højere klassetrin">+</button></div></div>
@@ -139,6 +142,7 @@ function skaermTop() {
 function startKamp() {
   kamp = { nr: 0, rigtige: 0, stribe: 0, point: 0, svar: [], maal: 0, skud: [], laast: false, q: null, indtastet: '' };
   world.startMatch(me.figur, kit(me));
+  world.setUdstyr(udstyr(me), kit(me));
   lyd.floejte();
   naesteOpgave();
 }
@@ -231,6 +235,7 @@ function startFinale() {
   kamp.finale = { antal, nr: 0, klar: false };
   if (kamp.rigtige === OPGAVER) givPoint(PERFEKT_BONUS);
   world.startFinale(me.figur, kit(me));
+  world.setUdstyr(udstyr(me), kit(me));
   lyd.floejte();
   show('s-finale', `${finaleHud()}<div class="callout">
     <h2>Finalen</h2>
@@ -280,7 +285,7 @@ function skaermResultat() {
   me.bedsteKamp = Math.max(me.bedsteKamp, k.point);
   const gemt = db.gem(me);
   kamp = null;
-  world.showHero(me.figur, kit(me));
+  hero(me);
   world.player.play(k.rigtige >= 5 ? 'cheer' : 'idle');
   const plads = db.topscore().findIndex((p) => p.id === me.id) + 1;
   show('s-result', `<div class="panel">
@@ -291,12 +296,48 @@ function skaermResultat() {
       <div class="stat"><b>${k.maal}/${k.finale.antal}</b><span>mål i finalen</span></div>
       <div class="stat"><b>+${k.point}</b><span>point</span></div>
     </div>
-    <p>Du har nu <b>${me.pointIAlt} point</b> og ligger nummer ${plads} på topscoren.</p>
+    <p>Du har nu <b>${me.pointIAlt} point</b> og ligger nummer ${plads} på topscoren. Du har ${me.point} point at købe for i butikken.</p>
     <p class="${gemt ? 'saved' : 'error'}">${gemt ? 'Dine point er gemt.' : 'Pointene kunne ikke gemmes på denne enhed.'}</p>
     <div class="row">${btn('spil', 'Spil igen', 'big')}</div>
-    <div class="row">${btn('top', 'Topscore', 'ghost')}${btn('hub', 'Omklædningsrum', 'ghost')}</div>
+    <div class="row">${btn('butik', 'Butik', 'ghost')}${btn('top', 'Topscore', 'ghost')}${btn('hub', 'Omklædningsrum', 'ghost')}</div>
   </div>`);
 }
+
+// ------------------------------------------------------------ butik
+function skaermButik(besked = '', scroll = 0) {
+  const o = udstyr(me);
+  hero(me);
+  const koebKnap = (a, k, id, pris) => (me.point >= pris
+    ? `<button class="buy" data-a="${a}" data-k="${k}" data-id="${id}">Køb · ${pris} p</button>`
+    : `<span class="need">Mangler ${pris - me.point} p</span>`);
+  const trin = Object.entries(TRIN).map(([k, kat]) => {
+    const naeste = kat.trin[o[k] + 1];
+    return `<section class="shop"><h2>${kat.navn}</h2>
+      <p class="muted">Du har: ${kat.trin[o[k]].navn} (${o[k]} af ${kat.trin.length - 1})</p>
+      ${naeste ? `<div class="item"><span><b>${naeste.navn}</b><small>${naeste.tekst}</small></span>${koebKnap('koebTrin', k, '', naeste.pris)}</div>`
+    : '<p class="saved">Du har købt det hele her.</p>'}</section>`;
+  }).join('');
+  const valg = Object.entries(VALG).map(([k, kat]) => `<section class="shop"><h2>${kat.navn}</h2>
+    ${Object.entries(kat.ting).map(([id, t]) => {
+    const ejer = o.ejet[k].includes(id), iBrug = o.valgt[k] === id;
+    return `<div class="item ${iBrug ? 'on' : ''}"><span><b>${t.navn}</b></span>${iBrug ? '<span class="inuse">I brug</span>'
+      : ejer ? `<button class="buy use" data-a="brug" data-k="${k}" data-id="${id}">Brug</button>` : koebKnap('koebTing', k, id, t.pris)}</div>`;
+  }).join('')}</section>`).join('');
+  show('s-shop', `<div class="panel">
+    <div class="row spread"><h1>Butik</h1><span class="wallet">${me.point} p</span></div>
+    <p class="${besked ? 'saved' : 'muted'}" aria-live="polite">${besked || 'Brug dine point på at gøre dit hold sejere. Du tjener point ved at svare rigtigt og score.'}</p>
+    ${valg}${trin}
+    ${btn('hub', 'Tilbage', 'ghost')}
+  </div>`);
+  ui.firstElementChild.scrollTop = scroll;
+}
+function handel(ok, navn) {
+  const scroll = ui.firstElementChild.scrollTop;
+  if (ok) { db.gem(me); lyd.rigtigt(); if (kampFejring) world.player.play('cheer'); }
+  skaermButik(ok ? navn : '', scroll);
+  if (ok && kampFejring) world.player.play('cheer');
+}
+let kampFejring = false;
 
 // ------------------------------------------------------------ hændelser
 const handlinger = {
@@ -322,6 +363,10 @@ const handlinger = {
   skift: (el) => { me[el.dataset.k] = !me[el.dataset.k]; db.gem(me); setLyd(me.lyd); skaermHub(); },
   spil: () => startKamp(),
   top: () => skaermTop(),
+  butik: () => skaermButik(),
+  koebTrin: (el) => { const k = el.dataset.k; const ok = koebTrin(me, k); kampFejring = false; handel(ok, ok ? `Købt: ${TRIN[k].trin[udstyr(me)[k]].navn}` : ''); },
+  koebTing: (el) => { const { k, id } = el.dataset; const ok = koebTing(me, k, id); kampFejring = k === 'jubel'; handel(ok, ok ? `Købt: ${VALG[k].ting[id].navn}` : ''); },
+  brug: (el) => { const { k, id } = el.dataset; const ok = brugTing(me, k, id); kampFejring = k === 'jubel'; handel(ok, ok ? `Du bruger nu: ${VALG[k].ting[id].navn}` : ''); },
   hub: () => skaermHub(),
   ret: () => nyDraft(me),
   spillere: () => skaermSpillere(),
@@ -347,7 +392,7 @@ ui.addEventListener('input', (e) => {
     const t = document.getElementById('klasseforslag');
     if (t) t.textContent = `Vi starter dig i ${klasseNavn(draft.klasse)}. Du kan altid ændre det.`;
   }
-  if (el.dataset.k === 'nummer') world.showHero(draft.figur, kit(draft));
+  if (el.dataset.k === 'nummer') hero(draft);
 });
 window.addEventListener('keydown', (e) => {
   if (!kamp || kamp.laast || !kamp.q || kamp.finale) return;

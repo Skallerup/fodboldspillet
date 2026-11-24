@@ -162,3 +162,17 @@ table.top { width: 100%; border-collapse: collapse; }
 .saved { color: #5fe08f; font-weight: 800; }
 @media (prefers-reduced-motion: reduce) { * { animation: none !important; transition: none !important; } }
 .top-group { display: flex; flex-direction: column; align-items: center; width: 100%; }
+
+/* ---------- butik ---------- */
+.wallet { font: 800 italic 2.4rem/1 var(--display); color: var(--flood); }
+.shop { display: grid; gap: 8px; }
+.shop h2 { font-size: 1.6rem; margin-top: 6px; }
+.item { display: flex; align-items: center; justify-content: space-between; gap: 12px; background: var(--night-2); padding: 10px 12px;
+  border-left: 6px solid transparent; }
+.item.on { border-left-color: var(--flood); }
+.item b { display: block; font-weight: 800; line-height: 1.2; }
+.item small { color: #a9b8d0; }
+.buy { flex: none; border: 0; background: var(--flood); color: var(--ink); font-weight: 800; padding: 10px 14px; min-height: 44px; }
+.buy.use { background: var(--chalk); }
+.need { flex: none; color: #a9b8d0; font-weight: 800; font-size: 0.95rem; }
+.inuse { flex: none; color: var(--flood); font-weight: 800; }

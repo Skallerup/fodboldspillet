@@ -10,6 +10,23 @@ const lerp = (a, b, k) => a + (b - a) * k;
 const clamp = (v, a, b) => Math.max(a, Math.min(b, v));
 const ease = (k) => k * k * (3 - 2 * k);
 
+const STOEVLER = { sort: 0x0b0b0e, hvid: 0xf2f2f2, roed: 0xd81e2c, neon: 0xb6f000, guld: 0xe0a81e };
+const BOLDE = {
+  klassisk: { lys: 0xf7f7f7, moerk: 0x050505 },
+  neon: { lys: 0xd6ff2a, moerk: 0x101418 },
+  guld: { lys: 0xf0b020, moerk: 0x7a4a00, ru: 0.25 },
+  ild: { lys: 0xff6a00, moerk: 0xffd21f, gloed: 0xff2a00 },
+};
+const POKALER = [0xb06a2c, 0xcfd6de, 0xf0b020, 0xffd21f];
+const kitMaps = {};
+function kitMap(navn) {
+  if (!kitMaps[navn]) {
+    const t = kitMaps[navn] = new THREE.TextureLoader().load(`assets/kits/${navn}.jpg`);
+    t.flipY = false; t.colorSpace = THREE.SRGBColorSpace; t.wrapS = t.wrapT = THREE.RepeatWrapping;
+  }
+  return kitMaps[navn];
+}
+
 class Figur {
   constructor(kind, src) {
     this.kind = kind;
@@ -35,24 +52,35 @@ class Figur {
       o.castShadow = true;
       const name = o.material.name;
       if (name === 'Number') { o.material = numMat; o.castShadow = false; }
-      else if (['Jersey', 'Shorts', 'Socks', 'Trim'].includes(name)) {
+      else if (['Jersey', 'Shorts', 'Socks', 'Trim', 'Boot'].includes(name)) {
         this.mats[name] ||= o.material.clone();
         o.material = this.mats[name];
       }
     });
+    this.stribeMap = this.mats.Jersey?.map || null;
+    this.jubel = 'hop';
     this.state = 'idle';
     this.t = Math.random() * 10;
     this.st = 0;
   }
-  setKit(farve1, farve2, nummer) {
+  setKit({ farve1, farve2, nummer, troeje = 'striber', stoevler = 'sort', jubel = 'hop' }) {
     const c1 = new THREE.Color(farve1), c2 = new THREE.Color(farve2);
-    this.mats.Jersey?.color.copy(c1);
+    this.jubel = jubel;
+    const j = this.mats.Jersey;
+    if (j) {
+      j.map = troeje === 'striber' ? this.stribeMap : kitMap(troeje);
+      j.color.copy(troeje === 'guld' ? new THREE.Color(0xffffff) : c1);
+      j.roughness = troeje === 'guld' ? 0.35 : 0.6;
+      j.needsUpdate = true;
+    }
+    this.mats.Boot?.color.set(STOEVLER[stoevler] || STOEVLER.sort);
     this.mats.Socks?.color.copy(c1);
     this.mats.Shorts?.color.copy(c2);
     this.mats.Trim?.color.copy(c2);
     const lum = (c) => 0.3 * c.r + 0.6 * c.g + 0.1 * c.b;
     let ink = farve2;
-    if (Math.abs(lum(c1) - lum(c2)) < 0.25) ink = lum(c1) > 0.5 ? '#10151f' : '#ffffff';
+    if (troeje === 'guld') ink = '#3a2300';
+    else if (Math.abs(lum(c1) - lum(c2)) < 0.25) ink = lum(c1) > 0.5 ? '#10151f' : '#ffffff';
     const g = this.canvas.getContext('2d');
     g.clearRect(0, 0, 256, 256);
     g.fillStyle = ink;
@@ -87,10 +115,34 @@ class Figur {
         break;
       }
       case 'cheer': {
-        m.position.y = Math.abs(Math.sin(st * 7)) * 0.45;
-        ArmL.rotation.z = 2.5 + Math.sin(st * 14) * 0.2; ArmR.rotation.z = -2.5 - Math.sin(st * 14) * 0.2;
-        Head.rotation.x = -0.25;
-        m.rotation.y = Math.sin(st * 3.5) * 0.5;
+        if (this.jubel === 'dans') {
+          const s = Math.sin(st * 8);
+          m.position.y = Math.abs(s) * 0.12;
+          m.rotation.z = s * 0.2; m.rotation.y = Math.sin(st * 4) * 0.7;
+          ArmL.rotation.z = 1.5 + s * 1.1; ArmR.rotation.z = -1.5 + s * 1.1;
+          LegL.rotation.z = Math.max(0, s) * 0.35; LegR.rotation.z = Math.min(0, s) * 0.35;
+          Head.rotation.z = -s * 0.2;
+        } else if (this.jubel === 'flyver') {
+          const a = st * 3.2, s = Math.sin(st * 12);
+          m.position.x = Math.sin(a) * 1.1; m.position.z = Math.sin(a * 2) * 0.5;
+          m.rotation.y = Math.cos(a) * 1.0; m.rotation.z = -Math.cos(a) * 0.3; m.rotation.x = 0.2;
+          ArmL.rotation.z = 1.55; ArmR.rotation.z = -1.55;
+          LegL.rotation.x = s * 0.9; LegR.rotation.x = -s * 0.9;
+        } else if (this.jubel === 'salto') {
+          const ph = (st % 1.3) / 1.3, k = clamp((ph - 0.15) / 0.6, 0, 1);
+          const a = -Math.PI * 2 * ease(k), c = 1.2;
+          m.rotation.x = a;
+          m.position.y = Math.sin(Math.PI * k) * 1.2 + c - c * Math.cos(a);
+          m.position.z = -c * Math.sin(a);
+          const tuck = Math.sin(Math.PI * k);
+          LegL.rotation.x = -tuck * 1.2; LegR.rotation.x = -tuck * 1.2;
+          ArmL.rotation.z = 2.4 - tuck * 1.4; ArmR.rotation.z = -2.4 + tuck * 1.4;
+        } else {
+          m.position.y = Math.abs(Math.sin(st * 7)) * 0.45;
+          ArmL.rotation.z = 2.5 + Math.sin(st * 14) * 0.2; ArmR.rotation.z = -2.5 - Math.sin(st * 14) * 0.2;
+          Head.rotation.x = -0.25;
+          m.rotation.y = Math.sin(st * 3.5) * 0.5;
+        }
         break;
       }
       case 'sad': {
@@ -171,7 +223,7 @@ export class World {
 
   async load(onProgress) {
     const loader = new GLTFLoader();
-    const files = { stadium: 'stadium.glb', ball: 'ball.glb' };
+    const files = { stadium: 'stadium.glb', ball: 'ball.glb', trophy: 'trophy.glb', mascot: 'mascot.glb' };
     for (const k of Object.keys(FIGURER)) files[k] = `char_${k}.glb`;
     let done = 0;
     const total = Object.keys(files).length;
@@ -197,11 +249,73 @@ export class World {
     this.aim.visible = false;
     this.scene.add(this.aim);
     this.initKonfetti();
+    this.initFyr();
+    // maskot
+    this.mascot = this.assets.mascot;
+    this.mascot.traverse((o) => { if (o.isMesh) o.castShadow = true; });
+    this.wings = [this.mascot.getObjectByName('WingL'), this.mascot.getObjectByName('WingR')];
+    this.mascot.visible = false;
+    this.scene.add(this.mascot);
+    // pokalbord
+    this.pokalbord = new THREE.Group();
+    const stand = this.assets.trophy.getObjectByName('Stand');
+    const cup = this.assets.trophy.getObjectByName('Cup');
+    this.pokalbord.add(stand);
+    this.cups = POKALER.map((farve, i) => {
+      const c = cup.clone(true);
+      c.traverse((o) => {
+        if (!o.isMesh) return;
+        o.castShadow = true;
+        if (o.material.name === 'Cup') { o.material = o.material.clone(); o.material.color.set(farve); }
+      });
+      c.scale.setScalar(i === 3 ? 1.25 : 0.8);
+      c.position.set(-1.0 + i * 0.68, 0.95, 0);
+      this.pokalbord.add(c);
+      return c;
+    });
+    this.pokalbord.position.set(1.9, 0, -2.3);
+    this.pokalbord.rotation.y = -0.35;
+    this.pokalbord.visible = false;
+    this.scene.add(this.pokalbord);
+    this.udstyr = { stadion: 0, tilskuere: 0, pokaler: 0, valgt: { bold: 'klassisk' } };
+  }
+
+  /** Anvend spillerens købte opgraderinger på verdenen. */
+  setUdstyr(o, kit) {
+    this.udstyr = o;
+    this.setStadion(o.stadion);
+    const banners = this.stadium.getObjectByName('Banners');
+    if (banners) {
+      banners.visible = o.tilskuere >= 2;
+      banners.traverse((m) => {
+        if (!m.isMesh) return;
+        if (m.material.name === 'TeamFlag1') m.material.color.set(kit.farve1);
+        if (m.material.name === 'TeamFlag2') m.material.color.set(kit.farve2);
+      });
+    }
+    const b = BOLDE[o.valgt?.bold] || BOLDE.klassisk;
+    this.ball.traverse((m) => {
+      if (!m.isMesh) return;
+      const lys = m.material.name === 'BallWhite';
+      m.material.color.set(lys ? b.lys : b.moerk);
+      m.material.roughness = b.ru ?? 0.4;
+      m.material.emissive.set(lys && b.gloed ? b.gloed : 0x000000);
+      m.material.emissiveIntensity = 0.55;
+    });
+    this.cups.forEach((c, i) => { c.visible = i < o.pokaler; });
+    this.placerEkstra();
+  }
+  placerEkstra() {
+    const o = this.udstyr, m = this.mascot;
+    this.pokalbord.visible = this.mode === 'hero' && o.pokaler > 0;
+    m.visible = o.tilskuere >= 1 && this.mode !== 'match';
+    if (this.mode === 'hero') { m.position.set(-3.0, 0, -1.0); m.rotation.y = 0.45; }
+    else if (this.mode === 'penalty') { m.position.set(6.4, 0, GOAL_Z - 1.0); m.rotation.y = Math.PI - 0.5; }
   }
 
   /** Stadion-niveau: 0 = træningsbane med små tribuner, højere niveauer låser mere op. */
   setStadion(niveau) {
-    const vis = { Trees: niveau < 2, StandsSmall: true, StandsBig: niveau >= 2, Roof: niveau >= 3, Floodlights: niveau >= 1 };
+    const vis = { Trees: niveau < 2, StandsSmall: true, StandsBig: niveau >= 2, Roof: niveau >= 3, Floodlights: niveau >= 1, Banners: false };
     for (const [name, v] of Object.entries(vis)) { const o = this.stadium.getObjectByName(name); if (o) o.visible = v; }
   }
 
@@ -231,11 +345,12 @@ export class World {
     if (this.mode !== 'hero') this.snap = true;
     this.mode = 'hero';
     const p = this.player = this.figur('player', kind);
-    p.setKit(kit.farve1, kit.farve2, kit.nummer);
+    p.setKit(kit);
     p.play('idle');
     this.hide('defender'); this.hide('keeper');
     this.aim.visible = false;
     this.ball.position.set(0.75, BALL_R, 0.7);
+    this.placerEkstra();
   }
 
   // ------------------------------------------------------------ kamp
@@ -251,20 +366,21 @@ export class World {
     this.snap = true;
     this.step = 0;
     const p = this.player = this.figur('player', kind);
-    p.setKit(kit.farve1, kit.farve2, kit.nummer);
+    p.setKit(kit);
     p.root.position.set(0, 0, START_Z);
     p.play('idle');
     const kinds = Object.keys(FIGURER).filter((k) => k !== kind);
     this.rivalKinds = kinds;
     const d = this.defender = this.figur('defender', kinds[0]);
     const mk = this.modstanderKit(kit);
-    d.setKit(mk.farve1, mk.farve2, 4);
+    d.setKit({ ...mk, nummer: 4 });
     d.root.position.set(0, 0, START_Z + 3.3);
     d.root.rotation.y = Math.PI;
     d.play('ready');
     this.hide('keeper');
     this.aim.visible = false;
     this.ball.position.set(0.2, BALL_R, START_Z + 0.9);
+    this.placerEkstra();
   }
   async matchStep(rigtigt) {
     const p = this.player, d = this.defender, ball = this.ball;
@@ -316,12 +432,13 @@ export class World {
     this.mode = 'penalty';
     this.snap = true;
     const p = this.player = this.figur('player', kind);
-    p.setKit(kit.farve1, kit.farve2, kit.nummer);
+    p.setKit(kit);
     this.hide('defender');
     const kinds = Object.keys(FIGURER).filter((k) => k !== kind);
     const g = this.goalie = this.figur('keeper', kinds[kinds.length - 1]);
-    g.setKit('#B6F000', '#15171C', 1);
+    g.setKit({ farve1: '#B6F000', farve2: '#15171C', nummer: 1 });
     this.resetSkud();
+    this.placerEkstra();
   }
   resetSkud() {
     const p = this.player, g = this.goalie;
@@ -395,6 +512,8 @@ export class World {
       res = 'maal';
       p.play('cheer'); p.root.rotation.y = Math.PI;
       this.konfettiStart();
+      if (this.udstyr.tilskuere >= 3) this.fyrStart();
+      this.maskotJubel = 3;
       await out(tx * 0.95, BALL_R, GOAL_Z + 1.5, 0.45);
       g.root.rotation.z = 0; g.root.position.y = 0; g.play('sad');
     } else if (stolpe) {
@@ -428,6 +547,38 @@ export class World {
     this.konfetti.visible = false;
     this.kLife = 0;
     this.scene.add(this.konfetti);
+  }
+  initFyr() {
+    const n = 360;
+    const geo = new THREE.BufferGeometry();
+    this.fPos = new Float32Array(n * 3);
+    this.fVel = new Float32Array(n * 3);
+    this.fCol = new Float32Array(n * 3);
+    geo.setAttribute('position', new THREE.BufferAttribute(this.fPos, 3));
+    geo.setAttribute('color', new THREE.BufferAttribute(this.fCol, 3));
+    this.fyr = new THREE.Points(geo, new THREE.PointsMaterial({ size: 0.5, vertexColors: true, transparent: true,
+      blending: THREE.AdditiveBlending, depthWrite: false }));
+    this.fyr.frustumCulled = false;
+    this.fyr.visible = false;
+    this.fLife = 0;
+    this.scene.add(this.fyr);
+  }
+  fyrStart() {
+    const n = this.fPos.length / 3, bursts = 4, per = n / bursts;
+    const pal = [0xffd21f, 0xff4a5a, 0x5fd0ff, 0x7dff9a, 0xffffff].map((c) => new THREE.Color(c));
+    for (let b = 0; b < bursts; b++) {
+      const cx = (Math.random() - 0.5) * 20, cy = 5.5 + Math.random() * 3.5, cz = GOAL_Z + 2 + Math.random() * 3;
+      const c = pal[Math.floor(Math.random() * pal.length)];
+      for (let i = b * per; i < (b + 1) * per; i++) {
+        const th = Math.random() * Math.PI * 2, ph = Math.acos(Math.random() * 2 - 1), sp = 4 + Math.random() * 3;
+        this.fPos.set([cx, cy, cz], i * 3);
+        this.fVel.set([Math.sin(ph) * Math.cos(th) * sp, Math.cos(ph) * sp, Math.sin(ph) * Math.sin(th) * sp], i * 3);
+        this.fCol.set([c.r, c.g, c.b], i * 3);
+      }
+    }
+    this.fyr.geometry.attributes.color.needsUpdate = true;
+    this.fLife = 2.2;
+    this.fyr.visible = true;
   }
   konfettiStart() {
     const n = this.kPos.length / 3;
@@ -497,6 +648,25 @@ export class World {
       }
       this.konfetti.geometry.attributes.position.needsUpdate = true;
       if (this.kLife <= 0) this.konfetti.visible = false;
+    }
+    if (this.fLife > 0) {
+      this.fLife -= dt;
+      const n = this.fPos.length / 3;
+      for (let i = 0; i < n * 3; i += 3) {
+        this.fVel[i + 1] -= 2.2 * dt;
+        this.fPos[i] += this.fVel[i] * dt; this.fPos[i + 1] += this.fVel[i + 1] * dt; this.fPos[i + 2] += this.fVel[i + 2] * dt;
+      }
+      this.fyr.geometry.attributes.position.needsUpdate = true;
+      this.fyr.material.opacity = Math.min(1, this.fLife / 0.8);
+      if (this.fLife <= 0) this.fyr.visible = false;
+    }
+    if (this.mascot?.visible) {
+      this.maskotJubel = Math.max(0, (this.maskotJubel || 0) - dt);
+      const fart = this.maskotJubel > 0 ? 16 : 5, hop = this.maskotJubel > 0 ? 0.5 : 0.08;
+      const s = Math.sin(this.time * fart);
+      this.mascot.position.y = Math.abs(s) * hop;
+      if (this.wings[0]) this.wings[0].rotation.z = 0.5 + s * 0.5 + (this.maskotJubel > 0 ? 1.2 : 0);
+      if (this.wings[1]) this.wings[1].rotation.z = -0.5 - s * 0.5 - (this.maskotJubel > 0 ? 1.2 : 0);
     }
     if (this.mode !== 'none') {
       this.kamera(dt);
