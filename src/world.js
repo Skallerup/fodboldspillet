@@ -66,6 +66,7 @@ class Figur {
   }
   setKit({ farve1, farve2, nummer, troeje = 'striber', stoevler = 'sort', jubel = 'hop' }) {
     const c1 = new THREE.Color(farve1), c2 = new THREE.Color(farve2);
+    this.kit = { farve1, farve2, nummer, troeje, stoevler, jubel };
     this.jubel = jubel;
     const j = this.mats.Jersey;
     if (j) {
@@ -207,7 +208,10 @@ export class World {
     this.camLook = new THREE.Vector3();
     this.snap = true;
     this.focus = new THREE.Vector3();
-    this.keeper = { baseX: 0, busy: false };
+    this.keeper = { baseX: 0, busy: false, klog: 0.5 };
+    this.lav = false;        // let grafik: lette figurer, ingen skygger, lavere opløsning
+    this.loaded = false;
+    this.maal = { tid: 0, vindue: 0, frames: 0 };
     this.resize();
     window.addEventListener('resize', () => this.resize());
     r.setAnimationLoop(() => this.frame());
@@ -226,13 +230,15 @@ export class World {
   loadFigur(kind) {
     if (this.assets[kind]) return Promise.resolve();
     this.pending ||= {};
-    return (this.pending[kind] ||= new GLTFLoader().loadAsync(`assets/models/char_${kind}.glb`).then((g) => { this.assets[kind] = g.scene; }));
+    const lav = this.lav;
+    return (this.pending[kind] ||= new GLTFLoader().loadAsync(`assets/models/char_${kind}${lav ? '_lite' : ''}.glb`)
+      .then((g) => { if (this.lav === lav) this.assets[kind] = g.scene; }));
   }
 
   async load(onProgress, ekstra = []) {
     const loader = new GLTFLoader();
     const files = { stadium: 'stadium.glb', ball: 'ball.glb', trophy: 'trophy.glb', mascot: 'mascot.glb' };
-    for (const k of new Set([...GRUNDFIGURER, ...ekstra])) files[k] = `char_${k}.glb`;
+    for (const k of new Set([...GRUNDFIGURER, ...ekstra])) files[k] = `char_${k}${this.lav ? '_lite' : ''}.glb`;
     let done = 0;
     const total = Object.keys(files).length;
     await Promise.all(Object.entries(files).map(async ([k, f]) => {
@@ -298,6 +304,46 @@ export class World {
     this.pokalbord.visible = false;
     this.scene.add(this.pokalbord);
     this.udstyr = { stadion: 0, tilskuere: 0, pokaler: 0, valgt: { bold: 'klassisk' } };
+    this.loaded = true;
+  }
+
+  /** Skift mellem flot og let grafik. Kan kaldes før indlæsning (så hentes de rigtige modeller med det samme) eller midt i spillet. */
+  async setKvalitet(lav) {
+    if (this.lav === lav) return;
+    this.lav = lav;
+    this.renderer.setPixelRatio(lav ? 1 : Math.min(window.devicePixelRatio || 1, 2));
+    this.sun.castShadow = !lav;
+    this.resize();
+    if (!this.loaded) return;
+    const kinds = Object.keys(FIGURER).filter((k) => this.assets[k]);
+    for (const k of kinds) delete this.assets[k];
+    this.pending = {};
+    await Promise.all(kinds.map((k) => this.loadFigur(k)));
+    if (this.lav !== lav) return;
+    for (const [slot, f] of Object.entries(this.slots)) {
+      if (!this.assets[f.kind]) continue;
+      const ny = this.nyFigur(f.kind);
+      ny.root.position.copy(f.root.position);
+      ny.root.rotation.copy(f.root.rotation);
+      ny.root.visible = f.root.visible;
+      if (f.kit) ny.setKit(f.kit);
+      ny.play(f.state);
+      this.scene.remove(f.root);
+      this.scene.add(ny.root);
+      this.slots[slot] = ny;
+      for (const navn of ['player', 'defender', 'goalie']) if (this[navn] === f) this[navn] = ny;
+    }
+  }
+  nyFigur(kind) {
+    const f = new Figur(kind, this.assets[kind]);
+    if (this.lav) {   // uden rigtige skygger får figuren en simpel mørk plet under sig
+      const plet = new THREE.Mesh(new THREE.CircleGeometry(0.75, 20),
+        new THREE.MeshBasicMaterial({ color: 0x000000, transparent: true, opacity: 0.28, depthWrite: false }));
+      plet.rotation.x = -Math.PI / 2;
+      plet.position.y = 0.02;
+      f.root.add(plet);
+    }
+    return f;
   }
 
   /** Anvend spillerens købte opgraderinger på verdenen. */
@@ -345,7 +391,7 @@ export class World {
     let f = this.slots[slot];
     if (!f || f.kind !== kind) {
       if (f) this.scene.remove(f.root);
-      f = this.slots[slot] = new Figur(kind, this.assets[kind]);
+      f = this.slots[slot] = this.nyFigur(kind);
       this.scene.add(f.root);
     }
     f.root.visible = true;
@@ -514,7 +560,7 @@ export class World {
     this.keeper.busy = true;
     const gx0 = g.root.position.x;
     const klog = Math.random() < this.keeper.klog;
-    const raekke = 3.0 + Math.max(0, this.keeper.klog - 0.5) * 2;   // dygtige målmænd når længere ud mod stolperne
+    const raekke = 3.6;   // målmanden kan nå helt ud til stolperne, når han gætter rigtigt
     const cx = clamp(klog ? gx0 + (tx - gx0) * 0.88 : (Math.random() * 2 - 1) * 3.0, -raekke, raekke);
     const cy = klog && ty > 1.7 ? Math.min(ty, 1.95) : 1.15;
     const tilt = clamp((cx - gx0) / 2.0, -1.25, 1.25);
@@ -657,7 +703,19 @@ export class World {
 
   frame() {
     const now = performance.now();
-    const dt = Math.min(0.05, (now - this.last) / 1000);
+    const raa = (now - this.last) / 1000;
+    // mål hastigheden de første sekunder: er enheden for langsom til flot grafik, giver vi besked
+    const m = this.maal;
+    if (this.onLangsom && this.loaded && !this.lav && this.mode !== 'none' && raa < 1 && m.tid < 18 && document.visibilityState === 'visible') {
+      m.tid += raa;
+      if (m.tid > 2) { m.vindue += raa; m.frames++; }   // de første 2 sekunder tæller ikke: der hakker alle enheder lidt
+      if (m.vindue >= 4) {
+        const fps = m.frames / m.vindue;
+        m.vindue = 0; m.frames = 0;
+        if (fps < 24) { const cb = this.onLangsom; this.onLangsom = null; cb(fps); }
+      }
+    }
+    const dt = Math.min(0.05, raa);
     this.last = now;
     this.time += dt;
     for (const tw of [...this.tweens]) {

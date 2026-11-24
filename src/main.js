@@ -17,7 +17,7 @@ const HOLDNAVNE = ['FC Lynet', 'Tordenstøvlerne', 'Regnehajerne', 'Gangeløvern
 const KAMPRAAB = ['Kom så!', 'Vi giver aldrig op!', 'Fuld fart frem!', 'Regn den ud!', 'Stolpe ind!'];
 const NIVEAU_NAVN = { let: 'Let', mellem: 'Mellem', svaer: 'Svær' };
 // Pokalturnering: tre kampe i træk. krav = mål man skal score i finalen, klog = hvor ofte målmanden gætter rigtigt.
-const RUNDER = [{ navn: 'Kvartfinale', krav: 2, klog: 0.45 }, { navn: 'Semifinale', krav: 3, klog: 0.6 }, { navn: 'Finale', krav: 3, klog: 0.72 }];
+const RUNDER = [{ navn: 'Kvartfinale', krav: 2, klog: 0.4 }, { navn: 'Semifinale', krav: 3, klog: 0.5 }, { navn: 'Finale', krav: 3, klog: 0.6 }];
 const TURNERING_POINT = 300;
 const HOLD = {
   rhino: { navn: 'Hornborg IF', farve1: '#6B7280', farve2: '#F4F4F0' },
@@ -144,16 +144,32 @@ function skaermHub() {
   stopTale();
   setLyd(me.lyd);
   hero(me);
-  const seg = (key, opts) => Object.entries(opts).map(([v, l]) =>
-    `<button class="chip" data-a="indstil" data-k="${key}" data-v="${v}" aria-pressed="${me[key] === v}">${l}</button>`).join('');
+  const valgt = arter(me);
+  const arterTekst = valgt.length === Object.keys(OPS).length ? 'Alle regnearter' : valgt.map((v) => OPS[v]).join(', ');
   show('s-hub', `<div class="panel">
     <div class="card" style="--c1:${me.farve1};--c2:${me.farve2}">
       <span class="badge">${esc(me.nummer)}</span>
       <span><b>${esc(me.navn)}</b><small>${esc(me.hold)} · „${esc(me.kampraab)}“</small></span>
       <span class="pts">${me.pointIAlt} p</span></div>
-    <div class="row">${btn('spil', 'Spil kamp', 'big')}${btn('turnering', me.turnering ? `Turnering: ${RUNDER[me.turnering.runde].navn.toLowerCase()}` : 'Pokalturnering')}</div>
-    <div class="row">${btn('butik', `Butik · ${me.point} p`, 'ghost')}</div>
+    ${btn('spil', 'Spil kamp', 'big wide')}
+    <button class="summary" data-a="indstillinger"><span><b>${klasseNavn(me.klasse)} · ${NIVEAU_NAVN[me.niveau]}</b><small>${arterTekst}</small></span><span class="inuse">Skift</span></button>
+    ${btn('turnering', me.turnering ? `Turnering: ${RUNDER[me.turnering.runde].navn.toLowerCase()}` : 'Pokalturnering', 'ghost wide')}
     ${dagHtml()}
+    <div class="tiles">
+      <button class="tile" data-a="butik"><b>Butik</b><small>${me.point} p</small></button>
+      <button class="tile" data-a="album"><b>Album</b><small>${antalKort(me)}/${alleKort().length}${samling(me) && me.pakker ? ` · ${me.pakker} pakke` : ''}</small></button>
+      <button class="tile" data-a="top"><b>Topscore</b><small>${me.kampe} kampe</small></button>
+      <button class="tile" data-a="indstillinger"><b>Indstillinger</b><small>Lyd, grafik, spiller</small></button>
+    </div>
+  </div>`);
+}
+function skaermIndstil(scroll = 0) {
+  const seg = (key, opts) => Object.entries(opts).map(([v, l]) =>
+    `<button class="chip" data-a="indstil" data-k="${key}" data-v="${v}" aria-pressed="${me[key] === v}">${l}</button>`).join('');
+  const g = grafikValg();
+  show('s-settings', `<div class="panel">
+    <h1>Indstillinger</h1>
+    <h2>Opgaver</h2>
     <div class="field"><span class="lbl">Klassetrin</span>
       <div class="stepper"><button data-a="klasse" data-v="-1" aria-label="Lavere klassetrin">−</button>
       <output>${klasseNavn(me.klasse)}</output><button data-a="klasse" data-v="1" aria-label="Højere klassetrin">+</button></div></div>
@@ -161,14 +177,31 @@ function skaermHub() {
     <div class="field"><span class="lbl">Regnearter (vælg en eller flere)</span><div class="chips">
       ${Object.entries(OPS).map(([v, l]) => `<button class="chip" data-a="art" data-v="${v}" aria-pressed="${arter(me).includes(v)}">${l}</button>`).join('')}
       <button class="chip" data-a="art" data-v="alle" aria-pressed="${arter(me).length === Object.keys(OPS).length}">Alle</button></div></div>
+    <h2>Lyd</h2>
     <div class="chips">
-      <button class="chip" data-a="skift" data-k="lyd" aria-pressed="${me.lyd}">Lyd</button>
+      <button class="chip" data-a="skift" data-k="lyd" aria-pressed="${me.lyd}">Lydeffekter</button>
       <button class="chip" data-a="skift" data-k="oplaesning" aria-pressed="${me.oplaesning}">Læs opgaver højt</button>
     </div>
-    <div class="row">${btn('album', `Album · ${antalKort(me)}/${alleKort().length}${samling(me) && me.pakker ? ` · ${me.pakker} ny pakke` : ''}`, 'ghost')}${btn('top', 'Topscore', 'ghost')}</div>
+    <h2>Grafik</h2>
+    <div class="chips">${Object.entries({ auto: 'Automatisk', flot: 'Flot', hurtig: 'Hurtig' }).map(([v, l]) =>
+    `<button class="chip" data-a="grafik" data-v="${v}" aria-pressed="${g === v}">${l}</button>`).join('')}</div>
+    <p class="muted">${g === 'auto' ? `Spillet vælger selv. Lige nu: ${world.lav ? 'hurtig' : 'flot'} grafik.` : 'Vælg „Hurtig“, hvis spillet hakker.'}</p>
+    <h2>Spiller</h2>
     <div class="row">${btn('ret', 'Ret spiller', 'ghost')}${btn('spillere', 'Skift spiller', 'ghost')}</div>
     <p class="muted">Kampe: ${me.kampe} · Mål: ${me.maal} · Bedste kamp: ${me.bedsteKamp} p${me.turneringer ? ` · Turneringer vundet: ${me.turneringer}` : ''}</p>
+    ${btn('hub', 'Tilbage', 'ghost')}
   </div>`);
+  ui.firstElementChild.scrollTop = scroll;
+}
+// Grafik gemmes for enheden (ikke pr. spiller): auto, flot eller hurtig
+const GRAFIK = 'fodboldspillet.grafik';
+function grafikValg() { try { return localStorage.getItem(GRAFIK) || 'auto'; } catch { return 'auto'; } }
+function skalVaereLet() {
+  const g = grafikValg();
+  if (g !== 'auto') return g === 'hurtig';
+  let maalt = null;
+  try { maalt = localStorage.getItem(GRAFIK + '.maalt'); } catch { /* ingen lagring */ }
+  return maalt === 'lav' || (navigator.deviceMemory || 8) <= 2 || (navigator.hardwareConcurrency || 8) <= 2;
 }
 function dagHtml() {
   const d = dagens(me);
@@ -309,7 +342,7 @@ function startFinale() {
   kamp.finale = { antal, nr: 0, klar: false, super: false };
   const t = kamp.turnering;
   if (kamp.rigtige === OPGAVER) givPoint(PERFEKT_BONUS);
-  world.startFinale(me.figur, kit(me), t ? { rival: t.figur, klog: t.klog } : {});
+  world.startFinale(me.figur, kit(me), t ? { rival: t.figur, klog: t.klog } : { klog: 0.3 + 0.025 * me.klasse });
   world.setUdstyr(udstyr(me), kit(me));
   lyd.floejte();
   show('s-finale', `${finaleHud()}<div class="callout">
@@ -528,7 +561,7 @@ const handlinger = {
     else valgt = alle.filter((x) => valgt.includes(x) || x === v);
     me.regnearter = valgt;
     db.gem(me);
-    skaermHub();
+    skaermIndstil(ui.firstElementChild.scrollTop);
   },
   turnering: async () => {
     if (!me.turnering) {
@@ -543,6 +576,13 @@ const handlinger = {
     startKamp(true);
   },
   superskud: () => { const f = kamp?.finale; if (f?.klar && kamp.superskud > 0) { f.super = !f.super; finaleKlar(); } },
+  indstillinger: () => skaermIndstil(),
+  grafik: async (el) => {
+    try { localStorage.setItem(GRAFIK, el.dataset.v); if (el.dataset.v !== 'auto') localStorage.removeItem(GRAFIK + '.maalt'); } catch { /* ingen lagring */ }
+    const scroll = ui.firstElementChild.scrollTop;
+    await world.setKvalitet(skalVaereLet());
+    if (ui.className === 's-settings') skaermIndstil(scroll);
+  },
   pakke: () => skaermPakke(),
   album: () => skaermAlbum(),
   visKort: (el) => skaermKort(el.dataset.id),
@@ -560,9 +600,9 @@ const handlinger = {
     el.dataset.sikker = '1'; el.classList.add('danger'); el.classList.remove('ghost');
     el.firstElementChild.textContent = 'Tryk igen for at slette';
   },
-  indstil: (el) => { me[el.dataset.k] = el.dataset.v; db.gem(me); skaermHub(); },
-  klasse: (el) => { me.klasse = Math.max(0, Math.min(10, me.klasse + Number(el.dataset.v))); db.gem(me); skaermHub(); },
-  skift: (el) => { me[el.dataset.k] = !me[el.dataset.k]; db.gem(me); setLyd(me.lyd); skaermHub(); },
+  indstil: (el) => { me[el.dataset.k] = el.dataset.v; db.gem(me); skaermIndstil(ui.firstElementChild.scrollTop); },
+  klasse: (el) => { me.klasse = Math.max(0, Math.min(10, me.klasse + Number(el.dataset.v))); db.gem(me); skaermIndstil(ui.firstElementChild.scrollTop); },
+  skift: (el) => { me[el.dataset.k] = !me[el.dataset.k]; db.gem(me); setLyd(me.lyd); skaermIndstil(ui.firstElementChild.scrollTop); },
   spil: () => startKamp(),
   top: () => skaermTop(),
   butik: () => { proeve = null; skaermButik(); },
@@ -623,6 +663,12 @@ stage.addEventListener('pointerdown', (e) => { if (kamp?.finale?.klar) skyd(e.cl
 
 // ------------------------------------------------------------ start
 (async function start() {
+  world.setKvalitet(skalVaereLet());
+  world.onLangsom = () => {
+    if (grafikValg() !== 'auto') return;
+    try { localStorage.setItem(GRAFIK + '.maalt', 'lav'); } catch { /* ingen lagring */ }
+    world.setKvalitet(true);
+  };
   try {
     const ekstra = db.profiler().map((p) => p.figur).filter((f) => FIGURER[f] && !GRUNDFIGURER.includes(f));
     await Promise.all([world.load((k) => { document.getElementById('bar').style.width = `${Math.round(k * 100)}%`; }, ekstra), hentKort(),
@@ -639,4 +685,4 @@ stage.addEventListener('pointerdown', (e) => { if (kamp?.finale?.klar) skyd(e.cl
 })();
 
 // til fejlfinding og test
-window.__spil = { world, db, get kamp() { return kamp; }, get me() { return me; } };
+window.__spil = { world, db, get kamp() { return kamp; }, get me() { return me; }, testNaeste: () => naesteOpgave() };

@@ -6,7 +6,7 @@ Dansk 3D-matematikspil til børn (0.-10. klasse) med fodboldtema. Statisk hjemme
 
 - Kør lokalt: `python3 -m http.server 8000`
 - Test: `node tests/math.test.mjs` og `node tests/daily.test.mjs`
-- Byg modeller: `python3 tools/blender/build_assets.py [--render]` (kræver Blender 5.x eller `pip install bpy`)
+- Byg modeller: `python3 tools/blender/build_assets.py [--render] [--cards]` og derefter `python3 tools/blender/build_assets.py --lite` (kræver Blender 5.x eller `pip install bpy`)
 
 ## Arkitektur
 
@@ -42,6 +42,14 @@ Dansk 3D-matematikspil til børn (0.-10. klasse) med fodboldtema. Statisk hjemme
 - Superskud: 5 rigtige i træk giver ét (`kamp.superskud`); `World.skyd(pt, onSpark, true)` er en ildkugle, der ikke kan reddes.
 - `src/daily.js`: dagens udfordring vælges ud fra datoen; `taelDag(p, id)` tæller og udløser præmien én gang pr. dag. Test: `node tests/daily.test.mjs`.
 
+## Grafik og indstillinger
+
+- Hver figur findes i to udgaver: `char_<navn>.glb` (ca. 38.000 trekanter) og `char_<navn>_lite.glb` (ca. 7.500, bygges med `build_assets.py --lite`).
+- `World.setKvalitet(lav)`: let grafik = lette figurer, ingen skygger (mørk plet under figurerne), lavere opløsning. `World.onLangsom` kaldes, hvis spillet kører under 24 billeder i sekundet de første sekunder.
+- Grafikvalget (auto, flot, hurtig) gemmes for enheden i `localStorage['fodboldspillet.grafik']`, ikke pr. spiller.
+- Omklædningsrummet (`skaermHub`) viser kun det vigtigste; klassetrin, niveau, regnearter, lyd, grafik og spiller ligger i `skaermIndstil`.
+- Målmanden: `klog` (hvor ofte han gætter rigtigt) er 0,3 + 0,025 pr. klassetrin i almindelige kampe; han kan nå helt ud til stolperne, når han gætter rigtigt.
+
 ## Idéer til senere
 
-Lettere modeller til langsomme enheder, fælles topscore online, flere figurer.
+Fælles topscore online, to spillere på samme enhed, flere figurer.

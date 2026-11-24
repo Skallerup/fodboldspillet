@@ -54,6 +54,7 @@ Alt 3D er lavet med Blender-scripts (Blender 5.x eller Python-modulet `bpy`):
 python3 tools/blender/build_assets.py            # figurer, bold og stadion til spillet
 python3 tools/blender/build_assets.py --render   # samme, plus et forhåndsbillede
 python3 tools/blender/build_assets.py --cards    # samme, plus billederne til samlekortene
+python3 tools/blender/build_assets.py --lite     # lette udgaver af figurerne til langsomme enheder
 python3 tools/blender/rhino_player.py --render   # detaljeret næsehorn til nærbilleder
 ```
 
@@ -75,5 +76,4 @@ Haj, drage og robot er hemmelige figurer, der låses op ved at score 15 mål, sv
 
 ## Idéer til senere
 
-- Lettere modeller til langsomme enheder.
 - Fælles topscoreliste på tværs af enheder.

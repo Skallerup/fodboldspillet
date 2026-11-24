@@ -38,6 +38,7 @@ BOOT = (0.04, 0.04, 0.05)
 NUMBER = "7"
 
 STUD = 0.03  # figuren loeftes, saa knopperne staar paa jorden
+LITE = False  # True: faerre polygoner (lette modeller til langsomme enheder)
 
 
 # ---------------------------------------------------------------- teksturer
@@ -137,6 +138,8 @@ def blob(name, loc, scale, material, group, rot=(0, 0, 0)):
     """Ellipsoide."""
     size = max(scale)
     seg = 12 if size < 0.05 else 20 if size < 0.2 else 32
+    if LITE:
+        seg = 6 if size < 0.05 else 10 if size < 0.2 else 16
     bpy.ops.mesh.primitive_uv_sphere_add(segments=seg, ring_count=seg // 2, location=loc, rotation=rot)
     o = bpy.context.object
     o.scale = scale
@@ -151,7 +154,7 @@ def limb(name, p1, p2, r1, r2, material, group, caps=True):
     """Tilspidset roer fra p1 til p2 med kugler i enderne."""
     p1, p2 = Vector(p1), Vector(p2)
     d = p2 - p1
-    bpy.ops.mesh.primitive_cone_add(vertices=24, radius1=r1, radius2=r2, depth=d.length,
+    bpy.ops.mesh.primitive_cone_add(vertices=10 if LITE else 24, radius1=r1, radius2=r2, depth=d.length,
                                     location=(p1 + p2) / 2)
     o = bpy.context.object
     o.rotation_euler = Vector((0, 0, 1)).rotation_difference(d).to_euler()
@@ -170,7 +173,7 @@ def limb(name, p1, p2, r1, r2, material, group, caps=True):
 def ring(name, loc, direction, major, minor, material, group, scale=(1, 1, 1)):
     """Hudfold: torus vinkelret paa 'direction'."""
     bpy.ops.mesh.primitive_torus_add(major_radius=major, minor_radius=minor, location=loc,
-                                     major_segments=32, minor_segments=10)
+                                     major_segments=16 if LITE else 32, minor_segments=6 if LITE else 10)
     o = bpy.context.object
     o.rotation_euler = Vector((0, 0, 1)).rotation_difference(Vector(direction)).to_euler()
     o.scale = scale
@@ -242,7 +245,7 @@ def fuse(name, objs, material, parent, voxel=0.012, smooth=8, keep=0.12, cutters
     o.data.materials.append(material)
     m = o.modifiers.new("remesh", "REMESH")
     m.mode = "VOXEL"
-    m.voxel_size = voxel
+    m.voxel_size = voxel * (1.3 if LITE else 1.0)
     _apply(o, m)
     for c in cutters:
         m = o.modifiers.new("cut", "BOOLEAN")
@@ -255,7 +258,7 @@ def fuse(name, objs, material, parent, voxel=0.012, smooth=8, keep=0.12, cutters
     m.iterations = smooth
     _apply(o, m)
     m = o.modifiers.new("decimate", "DECIMATE")
-    m.ratio = keep
+    m.ratio = keep * (0.35 if LITE else 1.0)
     _apply(o, m)
     _smooth(o)
     if uv == "front":

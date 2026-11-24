@@ -218,3 +218,15 @@ table.top { width: 100%; border-collapse: collapse; }
 .superknap { pointer-events: auto; border: 0; background: linear-gradient(180deg, #ffb01f, #ff5a00); color: #1a0a00; font: 800 italic 1.5rem/1 var(--display);
   text-transform: uppercase; padding: 14px 22px; min-height: 52px; transform: skewX(-9deg); box-shadow: 5px 5px 0 var(--ink); }
 .superknap[aria-pressed=true] { background: #fff; box-shadow: 0 0 0 4px #ff5a00, 5px 5px 0 var(--ink); }
+
+/* ---------- ryddeligt omklædningsrum ---------- */
+.btn.wide { width: 100%; }
+.summary { display: flex; align-items: center; justify-content: space-between; gap: 12px; width: 100%; text-align: left; background: var(--night-2);
+  border: 0; padding: 10px 14px; min-height: 56px; }
+.summary b { display: block; font-weight: 800; }
+.summary small { color: #a9b8d0; }
+.tiles { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
+.tile { background: var(--night-2); border: 0; border-bottom: 4px solid #2a426b; padding: 12px 14px; text-align: left; min-height: 64px; display: grid; gap: 2px; }
+.tile b { font: 800 italic 1.5rem/1 var(--display); text-transform: uppercase; }
+.tile small { color: #a9b8d0; }
+.s-settings h2 { font-size: 1.5rem; margin-top: 4px; color: var(--flood); }

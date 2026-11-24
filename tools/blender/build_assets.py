@@ -4,6 +4,7 @@ Koer:
     blender --background --python tools/blender/build_assets.py -- [--render]
 eller med bpy-modulet:
     python tools/blender/build_assets.py [--render] [--cards]
+    python tools/blender/build_assets.py --lite     (lette figurer: char_<navn>_lite.glb)
 
 Output (assets/models/):
     char_rhino.glb, char_lion.glb, char_croc.glb, char_panda.glb
@@ -226,7 +227,8 @@ def eye(hard, head, x, z, M, size=1.0, iris=None, pupil=(0.028, 0.016, 0.036)):
     blob("Iris", (x * 0.98, y - 0.005 * size, z - 0.005), (0.05 * size, 0.03 * size, 0.06 * size),
          iris or M["iris"], hard)
     blob("Pupil", (x * 0.97, y - 0.025 * size, z - 0.008), tuple(p * size for p in pupil), M["black"], hard)
-    blob("Glint", (x * 0.97 + 0.018 * s, y - 0.038 * size, z + 0.012), (0.009, 0.006, 0.009), M["white"], hard)
+    if not rp.LITE:
+        blob("Glint", (x * 0.97 + 0.018 * s, y - 0.038 * size, z + 0.012), (0.009, 0.006, 0.009), M["white"], hard)
 
 
 def brows(g, M, x, y, z, tilt=18):
@@ -481,6 +483,8 @@ def build_character(kind, tex):
     bpy.ops.object.empty_add(location=(0, 0, 0))
     root = bpy.context.object
     root.name = f"Char_{kind}"
+    if rp.LITE:   # ingen normal-teksturer i de lette modeller
+        tex = {k: ((v[0], None) if isinstance(v, tuple) else (None if k == "fabric_n" else v)) for k, v in tex.items()}
     skin = mat(f"Skin_{kind}", cfg["skin"], 0.8, tex[kind][0], tex[kind][1], 0.8)
     limb_mat = mat(f"Limb_{kind}", cfg["limb"], 0.8, None, tex[kind][1], 0.6) if cfg["limb"] else skin
     number = mat("Number", (1, 1, 1), 0.6)
@@ -509,11 +513,12 @@ def build_character(kind, tex):
         blob("SockTop", (x, -0.01, 0.50), (0.195, 0.195, 0.06), M["trim"], P)
         blob("Boot", (x, -0.10, 0.09), (0.17, 0.29, 0.10), M["boot"], P)
         blob("BootSole", (x, -0.10, 0.035), (0.175, 0.295, 0.035), M["white"], P)
-        blob("BootStripe", (x + 0.165 * s, -0.12, 0.10), (0.012, 0.13, 0.03), M["white"], P)
-        for dy in (-0.09, -0.14, -0.19):
+        for dy in (() if rp.LITE else (-0.09, -0.14, -0.19)):
             z = 0.09 + 0.10 * math.sqrt(1 - (dy / 0.29) ** 2)
             blob("Lace", (x, -0.10 + dy, z), (0.075, 0.012, 0.012), M["white"], P)
-        for sx, sy in ((-0.07, -0.30), (0.07, -0.30), (-0.09, -0.14), (0.09, -0.14), (-0.08, 0.06), (0.08, 0.06)):
+        if not rp.LITE:
+            blob("BootStripe", (x + 0.165 * s, -0.12, 0.10), (0.012, 0.13, 0.03), M["white"], P)
+        for sx, sy in (() if rp.LITE else ((-0.07, -0.30), (0.07, -0.30), (-0.09, -0.14), (0.09, -0.14), (-0.08, 0.06), (0.08, 0.06))):
             limb("Stud", (x + sx, sy, 0.02), (x + sx, sy, -rp.STUD), 0.022, 0.014, M["white"], P, caps=False)
 
     # krop
@@ -981,7 +986,14 @@ def main():
     os.makedirs(MODELS, exist_ok=True)
     os.makedirs(PREVIEWS, exist_ok=True)
     bpy.ops.wm.read_factory_settings(use_empty=True)
+    rp.LITE = "--lite" in args
     tex = make_textures()
+    if rp.LITE:   # kun figurerne, i en let udgave: char_<navn>_lite.glb
+        for kind in ANIMALS:
+            root = build_character(kind, tex)
+            print("TRIANGLES lite", kind, rp.triangles(root))
+            export(root, os.path.join(MODELS, f"char_{kind}_lite.glb"))
+        return
     chars = {}
     for kind in ANIMALS:
         root = build_character(kind, tex)
