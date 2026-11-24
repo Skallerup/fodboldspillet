@@ -43,6 +43,7 @@ python3 -m http.server 8000
 
 ```
 node tests/math.test.mjs
+node tests/daily.test.mjs
 ```
 
 ## Byg 3D-modellerne igen
@@ -65,6 +66,12 @@ tilskuere (maskotten Ørni, flag i holdets farver, fyrværkeri) og pokaler. Kata
 
 Efter hver kamp får man en kortpakke med ét af 24 samlekort (almindelige, sjældne og guld). Kortene samles i albummet.
 Haj, drage og robot er hemmelige figurer, der låses op ved at score 15 mål, svare rigtigt på 150 opgaver eller samle 10 forskellige kort.
+
+## Turnering, superskud og dagens udfordring
+
+- **Pokalturnering:** kvartfinale, semifinale og finale mod tre dyrehold. Man skal score 2, 3 og 3 mål for at gå videre, og målmændene bliver dygtigere. Vinderen får en turneringspokal, 300 point og to kortpakker.
+- **Superskud:** fem rigtige svar i træk giver en ildkugle til finalen, som målmanden ikke kan redde.
+- **Dagens udfordring:** en ny lille opgave hver dag, som giver 100 point og en ekstra kortpakke.
 
 ## Idéer til senere
 

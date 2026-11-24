@@ -208,3 +208,13 @@ table.top { width: 100%; border-collapse: collapse; }
 .acts { display: flex; align-items: center; gap: 8px; flex: none; }
 .need { text-align: right; line-height: 1.2; }
 .buy.use[aria-pressed=true] { background: var(--flood); }
+
+/* ---------- dagens udfordring, turnering og superskud ---------- */
+.dag { display: grid; gap: 3px; background: var(--night-2); border-left: 6px solid var(--flood); padding: 10px 12px; }
+.dag.done { border-left-color: var(--pitch); }
+.dag small { color: #a9b8d0; }
+.krav { margin-left: 10px; color: var(--flood); font-weight: 800; white-space: nowrap; }
+.bund { display: grid; gap: 8px; justify-items: center; pointer-events: none !important; }
+.superknap { pointer-events: auto; border: 0; background: linear-gradient(180deg, #ffb01f, #ff5a00); color: #1a0a00; font: 800 italic 1.5rem/1 var(--display);
+  text-transform: uppercase; padding: 14px 22px; min-height: 52px; transform: skewX(-9deg); box-shadow: 5px 5px 0 var(--ink); }
+.superknap[aria-pressed=true] { background: #fff; box-shadow: 0 0 0 4px #ff5a00, 5px 5px 0 var(--ink); }

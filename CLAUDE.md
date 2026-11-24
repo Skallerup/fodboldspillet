@@ -5,7 +5,7 @@ Dansk 3D-matematikspil til børn (0.-10. klasse) med fodboldtema. Statisk hjemme
 ## Kommandoer
 
 - Kør lokalt: `python3 -m http.server 8000`
-- Test opgaver: `node tests/math.test.mjs`
+- Test: `node tests/math.test.mjs` og `node tests/daily.test.mjs`
 - Byg modeller: `python3 tools/blender/build_assets.py [--render]` (kræver Blender 5.x eller `pip install bpy`)
 
 ## Arkitektur
@@ -35,6 +35,12 @@ Dansk 3D-matematikspil til børn (0.-10. klasse) med fodboldtema. Statisk hjemme
 - `LAASE` i `src/shop.js`: haj (15 mål), drage (150 rigtige svar) og robot (10 forskellige kort). De hentes først, når de skal bruges (`World.loadFigur`).
 - Regnearter vælges som liste i `me.regnearter` (fx `['plus', 'minus']`); `arter(p)` i `main.js` oversætter ældre gemte spillere.
 - Butikken har forhåndsvisning (`proeve` i `main.js`): viser varen på spilleren uden at ændre det gemte.
+
+## Turnering, superskud og dagens udfordring
+
+- Pokalturnering (`RUNDER`, `HOLD` i `main.js`): tre kampe mod dyrehold; man skal score `krav` mål i finalen. Status gemmes i `me.turnering`, sejre i `me.turneringer` (giver kæmpepokalen `World.storPokal`). `klog` styrer målmandens sværhedsgrad.
+- Superskud: 5 rigtige i træk giver ét (`kamp.superskud`); `World.skyd(pt, onSpark, true)` er en ildkugle, der ikke kan reddes.
+- `src/daily.js`: dagens udfordring vælges ud fra datoen; `taelDag(p, id)` tæller og udløser præmien én gang pr. dag. Test: `node tests/daily.test.mjs`.
 
 ## Idéer til senere
 

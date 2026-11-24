@@ -281,6 +281,18 @@ export class World {
       this.pokalbord.add(c);
       return c;
     });
+    // turneringspokalen: en kæmpepokal på gulvet, som kun kan vindes
+    this.storPokal = cup.clone(true);
+    this.storPokal.traverse((o) => {
+      if (!o.isMesh) return;
+      o.castShadow = true;
+      if (o.material.name === 'Cup') { o.material = o.material.clone(); o.material.color.set(0x8fe3ff); }
+    });
+    this.storPokal.scale.setScalar(1.6);
+    this.storPokal.position.set(-1.8, 0, 1.0);
+    this.storPokal.visible = false;
+    this.scene.add(this.storPokal);
+    this.turneringer = 0;
     this.pokalbord.position.set(1.9, 0, -2.3);
     this.pokalbord.rotation.y = -0.35;
     this.pokalbord.visible = false;
@@ -291,6 +303,7 @@ export class World {
   /** Anvend spillerens købte opgraderinger på verdenen. */
   setUdstyr(o, kit) {
     this.udstyr = o;
+    this.kitNu = kit;
     this.setStadion(o.stadion);
     const banners = this.stadium.getObjectByName('Banners');
     if (banners) {
@@ -316,6 +329,7 @@ export class World {
   placerEkstra() {
     const o = this.udstyr, m = this.mascot;
     this.pokalbord.visible = this.mode === 'hero' && o.pokaler > 0;
+    this.storPokal.visible = this.mode === 'hero' && this.turneringer > 0;
     m.visible = o.tilskuere >= 1 && this.mode !== 'match';
     if (this.mode === 'hero') { m.position.set(-3.0, 0, -1.0); m.rotation.y = 0.45; }
     else if (this.mode === 'penalty') { m.position.set(6.4, 0, GOAL_Z - 1.0); m.rotation.y = Math.PI - 0.5; }
@@ -357,6 +371,7 @@ export class World {
     p.play('idle');
     this.hide('defender'); this.hide('keeper');
     this.aim.visible = false;
+    this.ball.scale.setScalar(1);
     this.ball.position.set(0.75, BALL_R, 0.7);
     this.placerEkstra();
   }
@@ -368,7 +383,7 @@ export class World {
     const roed = hsl.s > 0.4 && (hsl.h < 0.07 || hsl.h > 0.93);
     return roed ? { farve1: '#1E5BD8', farve2: '#F4F4F0' } : { farve1: '#C81E2C', farve2: '#15171C' };
   }
-  startMatch(kind, kit) {
+  startMatch(kind, kit, opt = {}) {
     this.clearTweens();
     this.mode = 'match';
     this.snap = true;
@@ -378,8 +393,9 @@ export class World {
     p.root.position.set(0, 0, START_Z);
     p.play('idle');
     const kinds = Object.keys(FIGURER).filter((k) => k !== kind && this.assets[k]);
-    const d = this.defender = this.figur('defender', kinds[Math.floor(Math.random() * kinds.length)]);
-    const mk = this.modstanderKit(kit);
+    const d = this.defender = this.figur('defender', opt.rival || kinds[Math.floor(Math.random() * kinds.length)]);
+    const mk = opt.rivalKit || this.modstanderKit(kit);
+    this.ball.scale.setScalar(1);
     d.setKit({ ...mk, nummer: 4 });
     d.root.position.set(0, 0, START_Z + 3.3);
     d.root.rotation.y = Math.PI;
@@ -434,7 +450,8 @@ export class World {
   }
 
   // ------------------------------------------------------------ straffespark
-  startFinale(kind, kit) {
+  startFinale(kind, kit, opt = {}) {
+    this.keeper.klog = opt.klog ?? 0.5;   // hvor ofte målmanden gætter rigtigt
     this.clearTweens();
     this.mode = 'penalty';
     this.snap = true;
@@ -442,7 +459,7 @@ export class World {
     p.setKit(kit);
     this.hide('defender');
     const kinds = Object.keys(FIGURER).filter((k) => k !== kind && this.assets[k]);
-    const g = this.goalie = this.figur('keeper', kinds[Math.floor(Math.random() * kinds.length)]);
+    const g = this.goalie = this.figur('keeper', opt.rival || kinds[Math.floor(Math.random() * kinds.length)]);
     g.setKit({ farve1: '#B6F000', farve2: '#15171C', nummer: 1 });
     this.resetSkud();
     this.placerEkstra();
@@ -456,6 +473,8 @@ export class World {
     g.root.rotation.set(0, Math.PI, 0);
     g.play('ready');
     this.keeper.busy = false;
+    this.ball.scale.setScalar(1);
+    if (this.kitNu) this.setUdstyr(this.udstyr, this.kitNu);
     this.ball.position.set(0, BALL_R, SPOT_Z);
     this.ball.rotation.set(0, 0, 0);
   }
@@ -473,31 +492,38 @@ export class World {
     this.aim.visible = !!pt && this.mode === 'penalty';
     if (pt) this.aim.position.set(pt.x, pt.y, GOAL_Z - 0.1);
   }
-  /** Skyd mod et punkt. Giver 'maal', 'reddet', 'stolpe' eller 'forbi'. onSpark kaldes, når bolden rammes. */
-  async skyd(pt, onSpark) {
+  /** Skyd mod et punkt. Giver 'maal', 'reddet', 'stolpe' eller 'forbi'. onSpark kaldes, når bolden rammes.
+   *  Et superskud er en ildkugle, der altid rammer inden for målet og ikke kan reddes. */
+  async skyd(pt, onSpark, superskud = false) {
     const p = this.player, g = this.goalie, ball = this.ball;
     this.aim.visible = false;
-    const a = Math.random() * Math.PI * 2, rr = Math.random() * 0.32;
-    const tx = pt.x + Math.cos(a) * rr, ty = Math.max(0.2, pt.y + Math.sin(a) * rr);
+    const a = Math.random() * Math.PI * 2, rr = superskud ? 0 : Math.random() * 0.32;
+    let tx = pt.x + Math.cos(a) * rr, ty = Math.max(0.2, pt.y + Math.sin(a) * rr);
+    if (superskud) { tx = clamp(tx, -GOAL_HW + 0.6, GOAL_HW - 0.6); ty = clamp(ty, 0.4, GOAL_H - 0.6); }
     p.play('run');
     const px = p.root.position.x, pz = p.root.position.z;
     await this.tween(0.38, (k) => { p.root.position.set(lerp(px, -0.42, k), 0, lerp(pz, SPOT_Z - 0.75, k)); p.root.rotation.y = lerp(0.5, 0.25, k); });
     p.play('kick');
     await this.wait(0.2);
     onSpark?.();
+    if (superskud) {
+      ball.scale.setScalar(1.7);
+      ball.traverse((m) => { if (m.isMesh) { m.material.color.set(0xff5a00); m.material.emissive.set(0xff3000); m.material.emissiveIntensity = 1.6; } });
+    }
     // målmandens valg
     this.keeper.busy = true;
     const gx0 = g.root.position.x;
-    const klog = Math.random() < 0.5;
-    const cx = clamp(klog ? gx0 + (tx - gx0) * 0.88 : (Math.random() * 2 - 1) * 3.0, -3.0, 3.0);
+    const klog = Math.random() < this.keeper.klog;
+    const raekke = 3.0 + Math.max(0, this.keeper.klog - 0.5) * 2;   // dygtige målmænd når længere ud mod stolperne
+    const cx = clamp(klog ? gx0 + (tx - gx0) * 0.88 : (Math.random() * 2 - 1) * 3.0, -raekke, raekke);
     const cy = klog && ty > 1.7 ? Math.min(ty, 1.95) : 1.15;
     const tilt = clamp((cx - gx0) / 2.0, -1.25, 1.25);
     const rootX = cx - Math.sin(tilt) * 1.2, rootY = Math.max(0, cy - Math.cos(tilt) * 1.2);
     g.play(Math.abs(tilt) > 0.25 || cy > 1.3 ? 'dive' : 'ready');
     const inde = Math.abs(tx) < GOAL_HW - 0.2 && ty < GOAL_H - 0.2;
-    const reddet = inde && Math.abs(tx - cx) < 1.25 && Math.abs(ty - cy) < 1.0;
+    const reddet = !superskud && inde && Math.abs(tx - cx) < 1.25 && Math.abs(ty - cy) < 1.0;
     const stolpe = !inde && Math.abs(tx) < GOAL_HW + 0.3 && ty < GOAL_H + 0.3;
-    await this.tween(0.5, (k) => {
+    await this.tween(superskud ? 0.32 : 0.5, (k) => {
       ball.position.set(lerp(0, tx, k), lerp(BALL_R, ty, k) + Math.sin(Math.PI * k) * 0.45, lerp(SPOT_Z, GOAL_Z - 0.15, k));
       ball.rotation.x += 0.5;
       const e = ease(Math.min(1, k * 1.25));
@@ -617,7 +643,7 @@ export class World {
       } else if (this.mode === 'penalty') {
         const half = Math.tan(THREE.MathUtils.degToRad(cam.fov / 2)) * cam.aspect;
         const D = Math.max(11.8, 6.6 / half);
-        pos.set(0.7, Math.max(4.5, 0.39 * D), GOAL_Z - D);  // højt nok til at se målet over spilleren
+        pos.set(1.6, Math.max(4.5, 0.39 * D), GOAL_Z - D);  // højt nok til at se målet over spilleren
         look.set(0, 1.7, GOAL_Z);
       }
     }
